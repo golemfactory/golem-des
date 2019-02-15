@@ -43,13 +43,14 @@ impl TaskQueue {
         }
     }
 
-    fn rotate(&mut self) {
-        if let Some(mut task) = self.buffer.pop_front() {
+    fn pop(&mut self) -> Option<Task> {
+        self.buffer.pop_front().map(|task| {
             if self.repeating {
-                task.reset();
-                self.buffer.push_back(task);
+                self.buffer.push_back(task.clone());
             }
-        }
+
+            task
+        })
     }
 }
 
@@ -58,6 +59,7 @@ pub struct Requestor {
     id: Id,
     max_price: f64,
     budget_factor: f64,
+    task: Option<Task>,
     task_queue: TaskQueue,
     defence_mechanism: Box<dyn DefenceMechanism>,
     mean_cost: (usize, f64),
@@ -98,6 +100,7 @@ impl Requestor {
             id: id,
             max_price: max_price,
             budget_factor: budget_factor,
+            task: None,
             task_queue: TaskQueue::new(repeating),
             defence_mechanism: defence_mechanism_type.into_dm(id),
             mean_cost: (0, 0.0),
@@ -131,16 +134,21 @@ impl Requestor {
         }
     }
 
-    pub fn receive_benchmark(&mut self, provider_id: &Id, reported_usage: f64) {
-        self.defence_mechanism
-            .insert_provider_rating(provider_id, reported_usage);
-    }
-
     pub fn advertise<Rng>(&mut self, engine: &mut Engine<Event>, rng: &mut Rng)
     where
         Rng: rand::Rng,
     {
-        if !self.task_queue.buffer.is_empty() {
+        if let Some(task) = &self.task {
+            if !task.is_done() {
+                panic!(
+                    "R{}:cannot advertise new task as {} already pending",
+                    self.id, task
+                );
+            }
+        }
+
+        if let Some(task) = self.task_queue.pop() {
+            self.task = Some(task);
             self.num_tasks_advertised += 1;
 
             engine.schedule(
@@ -150,28 +158,20 @@ impl Requestor {
         }
     }
 
-    pub fn readvertise<Rng>(&mut self, engine: &mut Engine<Event>, _rng: &mut Rng)
-    where
-        Rng: rand::Rng,
-    {
-        if self
-            .task_queue
-            .buffer
-            .front()
-            .expect(&format!("R{}: task not found!", self.id))
-            .is_pending()
-        {
-            self.num_readvertisements += 1;
-
-            engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
-        }
+    pub fn receive_benchmark(&mut self, provider_id: &Id, reported_usage: f64) {
+        self.defence_mechanism
+            .insert_provider_rating(provider_id, reported_usage);
     }
 
     pub fn select_offers(&mut self, bids: Vec<(Id, f64)>) -> Vec<(Id, SubTask, f64)> {
         let mut bids = self.filter_offers(bids);
         self.rank_offers(&mut bids);
-        self.defence_mechanism
-            .schedule_subtasks(&mut self.task_queue.buffer, bids)
+        self.defence_mechanism.schedule_subtasks(
+            self.task
+                .as_mut()
+                .expect(&format!("R{}:task not found", self.id)),
+            bids,
+        )
     }
 
     fn filter_offers(&mut self, bids: Vec<(Id, f64)>) -> Vec<(Id, f64)> {
@@ -252,11 +252,9 @@ impl Requestor {
         );
 
         self.num_subtasks_computed += 1;
-
-        self.task_queue
-            .buffer
-            .front_mut()
-            .expect(&format!("R{}:task not found", self.id))
+        self.task
+            .as_mut()
+            .expect(&format!("R{}:task not found!", self.id))
             .subtask_computed(subtask);
     }
 
@@ -278,25 +276,43 @@ impl Requestor {
         Some(reported_usage * bid)
     }
 
-    pub fn schedule_next_task<Rng>(&mut self, engine: &mut Engine<Event>, rng: &mut Rng)
+    pub fn complete_task<Rng>(&mut self, engine: &mut Engine<Event>, rng: &mut Rng)
     where
         Rng: rand::Rng,
     {
-        let task = self
-            .task_queue
-            .buffer
-            .front()
-            .expect(&format!("R{}:task not found", self.id));
-
-        if task.is_done() {
-            debug!("R{}:{} computed", self.id, task);
+        if self
+            .task
+            .as_ref()
+            .expect(&format!("R{}:task not found", self.id))
+            .is_done()
+        {
+            debug!("R{}:task computed", self.id);
 
             self.defence_mechanism.task_computed();
-            self.task_queue.rotate();
             self.num_tasks_computed += 1;
-
             self.advertise(engine, rng);
+        } //else if self
+            // .task
+            // .as_ref()
+            // .expect(&format!("R{}:task not found", self.id))
+            // .is_pending()
+        // {
+            // self.num_readvertisements += 1;
+            // engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
+        // }
+    }
+
+    pub fn readvertise(&mut self, engine: &mut Engine<Event>) {
+        if self
+            .task
+            .as_ref()
+            .expect(&format!("R{}:task not found", self.id))
+            .is_pending()
+        {
+            self.num_readvertisements += 1;
+            engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
         }
+
     }
 
     pub fn budget_exceeded(
@@ -311,13 +327,13 @@ impl Requestor {
         );
 
         self.num_subtasks_cancelled += 1;
-        self.task_queue
-            .buffer
-            .front_mut()
+        self.num_readvertisements += 1;
+
+        self.task
+            .as_mut()
             .expect(&format!("R{}:task not found!", self.id))
             .push_subtask(subtask);
 
-        // subtasks still pending, re-advertise
         engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
     }
 

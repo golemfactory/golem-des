@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
@@ -36,7 +36,7 @@ impl DefenceMechanismType {
 pub trait DefenceMechanism: fmt::Debug {
     fn schedule_subtasks(
         &mut self,
-        subtask_queue: &mut VecDeque<Task>,
+        task: &mut Task,
         bids: Vec<(Id, f64)>,
     ) -> Vec<(Id, SubTask, f64)>;
 

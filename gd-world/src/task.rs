@@ -42,10 +42,6 @@ impl Task {
     pub fn subtask_computed(&mut self, subtask: SubTask) {
         self.done.push_back(subtask)
     }
-
-    pub fn reset(&mut self) {
-        self.pending.append(&mut self.done)
-    }
 }
 
 impl std::fmt::Display for Task {
