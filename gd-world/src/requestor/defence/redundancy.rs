@@ -10,7 +10,7 @@ use crate::task::{SubTask, Task};
 #[derive(Debug)]
 pub struct Redundancy {
     common: DefenceMechanismCommon,
-    verifications: HashMap<SubTask, Vec<(Id, f64)>>,
+    verifications: HashMap<Id, Vec<(Id, f64)>>,
 }
 
 impl Redundancy {
@@ -41,7 +41,7 @@ impl DefenceMechanism for Redundancy {
                         );
 
                         messages.push((provider_id, subtask, bid));
-                        self.verifications.entry(subtask).or_insert(Vec::new());
+                        self.verifications.entry(subtask.id()).or_insert(Vec::new());
                     }
                 }
                 None => break,
@@ -58,7 +58,7 @@ impl DefenceMechanism for Redundancy {
         reported_usage: f64,
         _bid: f64,
     ) {
-        if let Some((subtask, mut verification)) = self.verifications.remove_entry(&subtask) {
+        if let Some((subtask, mut verification)) = self.verifications.remove_entry(&subtask.id()) {
             let self_id = self.as_dm_common().id;
             let usage_factor = self
                 .as_dm_common()

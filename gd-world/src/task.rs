@@ -1,10 +1,9 @@
 use std::collections::VecDeque;
 use std::fmt;
-use std::hash::{Hash, Hasher};
 
 use crate::id::Id;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Task {
     pub subtask_count: usize,
     pending: VecDeque<SubTask>,
@@ -20,6 +19,15 @@ impl Task {
             subtask_count: subtask_count,
             pending: (0..subtask_count).map(|_| generator()).collect(),
             done: VecDeque::with_capacity(subtask_count),
+        }
+    }
+
+    // WARN: will replicate current state of the Task!
+    pub fn replicate(&self) -> Task {
+        Task {
+            subtask_count: self.subtask_count,
+            pending: self.pending.iter().map(|s| s.replicate()).collect(),
+            done: self.done.iter().map(|s| s.replicate()).collect(),
         }
     }
 
@@ -71,6 +79,18 @@ impl SubTask {
             budget: budget,
         }
     }
+
+    fn replicate(&self) -> SubTask {
+        SubTask {
+            id: Id::new(),
+            nominal_usage: self.nominal_usage,
+            budget: self.budget,
+        }
+    }
+
+    pub fn id(&self) -> Id {
+        self.id
+    }
 }
 
 impl std::fmt::Display for SubTask {
@@ -80,19 +100,5 @@ impl std::fmt::Display for SubTask {
             "SubTask({}, {}, {})",
             self.id, self.nominal_usage, self.budget
         )
-    }
-}
-
-impl PartialEq for SubTask {
-    fn eq(&self, other: &SubTask) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Eq for SubTask {}
-
-impl Hash for SubTask {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
     }
 }
