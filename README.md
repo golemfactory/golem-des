@@ -1,39 +1,29 @@
 golem-des
 ---
 
-Golem-des is a Golem marketplace agent-based DES simulator. It is currently designed to simulate the market with usages that will be standard in Golem with Golem Clay release.
+Golem-des is a Golem marketplace agent-based DES simulation package. It is currently designed to simulate the market with usages that will be standard in Golem with Golem Clay release.
 
 ## Using the simulator
 
 ### Building
-First of all, you'll need to install the required prerequisities which are `libgsl` and `gnuplot`. On Ubuntu, this can be accomplished by running the following command
+The main simulation libs (`gd-engine` and `gd-world`) do not have any special build prerequisites. `gd-tools` and `gd-cli` on the other hand require `libgsl` and `gnuplot` respectively. On a Debian-based system, you can install the required dependencies like so:
 
 ```
-$ sudo apt install gnuplot libgsl23 libgsl-dev
-```
-
-To then build the simulator in release mode, run in the command line
-
-```
-$ cargo build --release
-```
-
-To test it, run
-
-```
-$ cargo test
+$ sudo apt-get install gnuplot libgsl23 libgsl-dev
 ```
 
 ### Running
-After the simulator has been built, it can be executed from the command line as follows (here, we assume you're at the top of the crate, i.e., in `golem-des`)
+The shipped, basic version of the simulator's CLI can be executed from the command line as follows (here, we assume you're at the top of the crate, i.e., in `golem-des`)
 
 ```
-$ ./target/release/gm_des <some-simulation-scenario-in-json> --repetitions=100 --output-dir=<output-dir>
+$ ./target/release/run <some-simulation-scenario-in-json> --repetitions=100 --defence=ctasks --output-dir=<output-dir>
 ```
 
-By default, the simulator will repeat the scenario for 100 times, hence, `--repetitions` can be omitted unless you want to run the simulation for a specific number of times.
+Firstly, by default, the simulator will repeat the scenario for 100 times, hence, `--repetitions` can be omitted unless you want to run the simulation for a specific number of times.
 
-By default, the simulator will save the resultant statistics in the current working directory. If you want to specify an alternative directory, pass it as an optional argument '--output-dir'.
+Secondly, the simulator assumes that the requestors defend themeselves from malicious providers using a CTasks defence mechanism. If you want to test a different defence mechanism, you can specify it via `--defence` flag which accepts the following values: `ctasks`, `lgrola`, and `redundancy`.
+
+Lastly, the simulator will save the resultant statistics in the current working directory. If you want to specify an alternative directory, pass it as an optional argument `--output-dir`.
 
 ### Specifying the simulation scenario
 The only required argument for the simulator is the simulation scenario in JSON format as evidenced in the example invocation above. Several example scenarios in JSON format can be found in [scenarios/](scenarios) directory. However, the general structure can be summarised as follows
@@ -160,23 +150,23 @@ As already mentioned, by default, the simulator will output CSV files with gathe
 In case of providers, the CSV files contains the following columns
 
 ```txt
-min_price,usage_factor,profit_margin,price,revenue,num_subtasks_assigned,num_subtasks_computed,num_subtasks_cancelled
-0.00001,0.9880009379706052,9.265960685380145,0.00010265960685380146,26.790677283395098,415,232,182
-0.00001,0.9742003077882163,10.246742693436717,0.00011246742693436718,28.25978137866988,473,248,224
-0.00001,0.3208405263278145,30.812674573427067,0.0003181267457342707,58.90975497394528,1257,892,364
-0.00001,0.9033102078285482,11.88548890207499,0.00012885488902074992,31.398507100223867,463,255,207
-0.00001,0.21567254514292833,45.98127550501441,0.0004698127550501441,87.39514529618569,1808,1304,503
+run_id,behaviour,min_price,usage_factor,profit_margin,price,revenue,num_subtasks_assigned,num_subtasks_computed,num_subtasks_cancelled
+0,undercut_budget,0.00001,0.9880009379706052,9.265960685380145,0.00010265960685380146,26.790677283395098,415,232,182
+0,regular,0.00001,0.9742003077882163,10.246742693436717,0.00011246742693436718,28.25978137866988,473,248,224
+0,regular,0.00001,0.3208405263278145,30.812674573427067,0.0003181267457342707,58.90975497394528,1257,892,364
+0,regular,0.00001,0.9033102078285482,11.88548890207499,0.00012885488902074992,31.398507100223867,463,255,207
+0,regular,0.00001,0.21567254514292833,45.98127550501441,0.0004698127550501441,87.39514529618569,1808,1304,503
 ```
 
 Whereas, in case of requestors, it is the following
 
 ```txt
-max_price,budget_factor,num_tasks_advertised,num_tasks_computed,num_readvertisements,num_subtasks_computed,num_subtasks_cancelled
-0.0001,0.37,6,5,36331,285,475
-0.0001,0.37,5,4,35867,314,501
-0.0001,2.72,18,17,36118,751,0
-0.0001,2.72,14,13,36594,795,0
-0.0001,1,54,53,32949,538,127
+run_id,max_price,budget_factor,mean_cost,num_tasks_advertised,num_tasks_computed,num_readvertisements,num_subtasks_computed,num_subtasks_cancelled
+0,0.0001,0.37,0.5,6,5,36331,285,475
+0,0.0001,0.37,0.51,5,4,35867,314,501
+0,0.0001,2.72,0.23,18,17,36118,751,0
+0,0.0001,2.72,0.23,14,13,36594,795,0
+0,0.0001,1,0.35,54,53,32949,538,127
 ```
 
 This way, as the user of the simulator, you are not constrained to Rust for further (statistical) processing of the simulation output. However, for your convenience, a basic analysis tool is bundled with the simulator. It can be invoked from the command line by running
@@ -192,18 +182,5 @@ The analysis tool currently aggregates the providers and requestors by their usa
 * For providers: mean (end) price, mean (end) effective price (that is, price times usage factor), and mean revenue.
 * For requestors: mean ratio of subtasks cancelled to subtasks computed.
 
-## Development
-To build the simulator in debug mode, run in the command line
-
-```
-$ cargo build
-```
-
-To test it, run
-
-```
-$ cargo test
-```
-
 ## License
-[GPL-3.0](../../../LICENSE.txt)
+[GPL-3.0](LICENSE.txt)
