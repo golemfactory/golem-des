@@ -46,7 +46,7 @@ impl TaskQueue {
     fn pop(&mut self) -> Option<Task> {
         self.buffer.pop_front().map(|task| {
             if self.repeating {
-                self.buffer.push_back(task.clone());
+                self.buffer.push_back(task.replicate());
             }
 
             task
@@ -292,14 +292,14 @@ impl Requestor {
             self.num_tasks_computed += 1;
             self.advertise(engine, rng);
         } //else if self
-            // .task
-            // .as_ref()
-            // .expect(&format!("R{}:task not found", self.id))
-            // .is_pending()
-        // {
-            // self.num_readvertisements += 1;
-            // engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
-        // }
+          // .task
+          // .as_ref()
+          // .expect(&format!("R{}:task not found", self.id))
+          // .is_pending()
+          // {
+          // self.num_readvertisements += 1;
+          // engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
+          // }
     }
 
     pub fn readvertise(&mut self, engine: &mut Engine<Event>) {
@@ -312,7 +312,6 @@ impl Requestor {
             self.num_readvertisements += 1;
             engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
         }
-
     }
 
     pub fn budget_exceeded(
