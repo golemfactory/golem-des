@@ -1,0 +1,39 @@
+{
+    "seed": 42,
+    "duration": 604800,
+    "providers": [
+        {
+            "min_price": 0.00000001,
+            "usage_factor": 0.5,
+            "behaviour": {
+              "undercut_budget": 0.0
+            }
+        }
+    ],
+    "provider_sources": [
+        {
+            "provider_count": 5,
+            "min_price": {
+              "fixed": 0.0001
+            },
+            "usage_factor": {
+              "uniform": [0.0, 1.0]
+            }
+        }
+    ],
+    "requestors": [
+        {
+            "max_price": 0.001,
+            "budget_factor": 0.5,
+            "tasks": [
+                {
+                    "subtask_count": 10,
+                    "nominal_usage": {
+                      "fixed": 200
+                    }
+                }
+            ],
+            "repeating": true
+        }
+    ]
+}

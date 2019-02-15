@@ -1,0 +1,10 @@
+[workspace]
+members = [
+  'gd-cli',
+  'gd-tools',
+  'gd-engine',
+  'gd-world',
+]
+
+[profile.release]
+lto = true

@@ -1,0 +1,55 @@
+{
+    "seed": 42,
+    "duration": 604800,
+    "providers": [
+        {
+            "min_price": 0.000005,
+            "usage_factor": 0.01
+        }
+    ],
+    "provider_source": {
+        "provider_count": 49,
+        "min_price": {
+          "fixed": 0.00001
+        },
+        "usage_factor": {
+          "uniform": [0.0, 1.1]
+        }
+    },
+    "requestors": [
+        {
+            "max_price": 0.001,
+            "budget_factor": 0.5,
+            "tasks": [
+                {
+                    "subtask_count": 200,
+                    "nominal_usage": {
+                      "fixed": 1000
+                    }
+                },
+                {
+                    "subtask_count": 10,
+                    "nominal_usage": {
+                      "fixed": 3600
+                    }
+                }
+            ],
+            "repeating": true
+        }
+    ],
+    "requestor_source": {
+        "requestor_count": 49,
+        "max_price": {
+          "fixed": 0.0001
+        },
+        "budget_factor": {
+          "choice": [0.37, 1.0, 2.72]
+        },
+        "subtask_count": {
+          "uniform": [10, 100]
+        },
+        "nominal_usage": {
+          "uniform": [100, 3600]
+        }
+    }
+}

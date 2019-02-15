@@ -1,0 +1,22 @@
+[package]
+name = "gd-tools"
+version = "0.1.0"
+authors = ["Jakub Konka <jakub.konka@golem.network>"]
+edition = "2018"
+
+[dependencies]
+docopt = "1"
+serde = "1.0"
+serde_derive = "1.0"
+csv = "1"
+statrs = "0.10"
+
+[target.'cfg(macos)'.dependencies.GSL]
+version = "*"
+git = "https://github.com/GuillaumeGomez/rust-GSL"
+features = ["v2"]
+
+[target.'cfg(not(macos))'.dependencies.GSL]
+version = "*"
+git = "https://github.com/GuillaumeGomez/rust-GSL"
+

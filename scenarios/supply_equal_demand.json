@@ -1,0 +1,62 @@
+{
+    "seed": 42,
+    "duration": 604800,
+    "provider_sources": [
+        {
+            "provider_count": 50,
+            "min_price": {
+              "fixed": 0.00001
+            },
+            "usage_factor": {
+              "uniform": [0.0, 1.1]
+            }
+        }
+    ],
+    "requestor_sources": [
+        {
+            "requestor_count": 25,
+            "max_price": {
+              "fixed": 0.0001
+            },
+            "budget_factor": {
+              "choice": [0.37, 1.0, 2.72]
+            },
+            "subtask_count": {
+              "uniform": [10, 100]
+            },
+            "nominal_usage": {
+              "uniform": [200, 400]
+            }
+        },
+        {
+            "requestor_count": 15,
+            "max_price": {
+              "fixed": 0.0001
+            },
+            "budget_factor": {
+              "choice": [0.37, 1.0, 2.72]
+            },
+            "subtask_count": {
+              "uniform": [10, 100]
+            },
+            "nominal_usage": {
+              "normal": [1000, 10]
+            }
+        },
+        {
+            "requestor_count": 10,
+            "max_price": {
+              "fixed": 0.0001
+            },
+            "budget_factor": {
+              "choice": [0.37, 1.0, 2.72]
+            },
+            "subtask_count": {
+              "uniform": [10, 100]
+            },
+            "nominal_usage": {
+              "normal": [1000, 200]
+            }
+        }
+    ]
+}
