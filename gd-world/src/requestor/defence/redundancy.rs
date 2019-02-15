@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use log::debug;
 
@@ -25,18 +25,14 @@ impl Redundancy {
 impl DefenceMechanism for Redundancy {
     fn schedule_subtasks(
         &mut self,
-        subtask_queue: &mut VecDeque<Task>,
+        task: &mut Task,
         bids: Vec<(Id, f64)>,
     ) -> Vec<(Id, SubTask, f64)> {
         let self_id = self.as_dm_common().id;
         let mut messages: Vec<(Id, SubTask, f64)> = Vec::new();
 
         for chunk in bids.chunks_exact(2) {
-            match subtask_queue
-                .front_mut()
-                .expect(&format!("R{}:task not found!", self_id))
-                .pop_subtask()
-            {
+            match task.pop_subtask() {
                 Some(subtask) => {
                     for &(provider_id, bid) in chunk {
                         debug!(

@@ -125,7 +125,7 @@ where
             provider.receive_subtask(&mut self.engine, &mut self.rng, requestor_id, subtask, bid);
         }
 
-        requestor.readvertise(&mut self.engine, &mut self.rng);
+        requestor.readvertise(&mut self.engine);
     }
 
     fn handle_compute(&mut self, subtask: SubTask, requestor_id: Id, provider_id: Id, bid: f64) {
@@ -144,7 +144,7 @@ where
         requestor.verify_subtask(provider_id, subtask, bid, reported_usage);
         let payment = requestor.send_payment(provider_id, subtask, bid, reported_usage);
         provider.receive_payment(requestor_id, subtask, payment);
-        requestor.schedule_next_task(&mut self.engine, &mut self.rng);
+        requestor.complete_task(&mut self.engine, &mut self.rng);
     }
 
     fn handle_budget_exceeded(&mut self, subtask: SubTask, requestor_id: Id, provider_id: Id) {

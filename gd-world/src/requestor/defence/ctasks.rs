@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 
 use log::debug;
 use statrs::statistics::Statistics;
@@ -28,18 +28,14 @@ impl CTasks {
 impl DefenceMechanism for CTasks {
     fn schedule_subtasks(
         &mut self,
-        subtask_queue: &mut VecDeque<Task>,
+        task: &mut Task,
         bids: Vec<(Id, f64)>,
     ) -> Vec<(Id, SubTask, f64)> {
         let self_id = self.as_dm_common().id;
         let mut messages: Vec<(Id, SubTask, f64)> = Vec::new();
 
         for (provider_id, bid) in bids {
-            match subtask_queue
-                .front_mut()
-                .expect(&format!("R{}:task not found!", self_id))
-                .pop_subtask()
-            {
+            match task.pop_subtask() {
                 Some(subtask) => {
                     debug!(
                         "R{}:sending {} to P{} for {}",
