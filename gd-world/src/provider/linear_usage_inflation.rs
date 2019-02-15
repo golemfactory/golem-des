@@ -87,12 +87,11 @@ mod tests {
 
     use statrs::assert_almost_eq;
 
-    use crate::provider::ProviderCommon;
     use crate::task::SubTask;
 
     #[test]
     fn linear_usage_inflation_provider_reported_usage() {
-        let mut provider = LinearUsageInflationProvider::new(1.0, ProviderCommon::new(0.1, 0.5));
+        let mut provider = LinearUsageInflationProvider::new(0.1, 0.5, 1.0);
         let subtask = SubTask::new(100.0, 100.0);
         assert_almost_eq!(50.0, provider.report_usage(&subtask, 1.0), 1e-3);
 
