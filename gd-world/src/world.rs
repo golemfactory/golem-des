@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use gd_engine::Engine;
 use log::debug;
+use rand::seq::SliceRandom;
 
 use crate::id::Id;
 use crate::provider;
@@ -124,8 +125,6 @@ where
 
             provider.receive_subtask(&mut self.engine, &mut self.rng, requestor_id, subtask, bid);
         }
-
-        requestor.readvertise(&mut self.engine);
     }
 
     fn handle_compute(&mut self, subtask: SubTask, requestor_id: Id, provider_id: Id, bid: f64) {
@@ -144,7 +143,9 @@ where
         requestor.verify_subtask(provider_id, subtask, bid, reported_usage);
         let payment = requestor.send_payment(provider_id, subtask, bid, reported_usage);
         provider.receive_payment(requestor_id, subtask, payment);
-        requestor.complete_task(&mut self.engine, &mut self.rng);
+        requestor.complete_task();
+
+        self.schedule_advertise();
     }
 
     fn handle_budget_exceeded(&mut self, subtask: SubTask, requestor_id: Id, provider_id: Id) {
@@ -159,7 +160,9 @@ where
             .expect("W:provider not found");
 
         provider.cancel_computing(self.engine.now(), requestor_id, subtask);
-        requestor.budget_exceeded(&mut self.engine, provider_id, subtask);
+        requestor.budget_exceeded(provider_id, subtask);
+
+        self.schedule_advertise();
     }
 
     fn handle(&mut self, event: Event) {
@@ -175,7 +178,7 @@ where
     }
 
     fn started(&mut self) {
-        // pre-populate usage ratings
+        // collect benchmarks
         let usage_factors: Vec<(Id, f64)> = self
             .providers
             .iter()
@@ -186,9 +189,9 @@ where
             for (id, usage_factor) in &usage_factors {
                 requestor.receive_benchmark(id, *usage_factor);
             }
-
-            requestor.advertise(&mut self.engine, &mut self.rng);
         }
+
+        self.schedule_advertise();
 
         debug!("W:simulation started");
     }
@@ -202,6 +205,19 @@ where
 
         for (_, provider) in &self.providers {
             debug!("W:{}", provider);
+        }
+    }
+
+    fn schedule_advertise(&mut self) {
+        // shuffle requestors
+        let mut ids: Vec<Id> = self.requestors.keys().cloned().collect();
+        ids.shuffle(&mut self.rng);
+
+        for id in ids {
+            self.requestors
+                .get_mut(&id)
+                .expect("W:requestor not found")
+                .advertise(&mut self.engine, &mut self.rng);
         }
     }
 }

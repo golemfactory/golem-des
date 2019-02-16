@@ -71,7 +71,7 @@ pub struct Requestor {
 }
 
 impl Requestor {
-    const MEAN_TASK_ARRIVAL_TIME: f64 = 900.0;
+    const MEAN_TASK_ARRIVAL_TIME: f64 = 3600.0;
     const READVERT_DELAY: f64 = 60.0;
 
     pub fn new(
@@ -139,22 +139,19 @@ impl Requestor {
         Rng: rand::Rng,
     {
         if let Some(task) = &self.task {
-            if !task.is_done() {
-                panic!(
-                    "R{}:cannot advertise new task as {} already pending",
-                    self.id, task
+            if task.is_pending() {
+                self.num_readvertisements += 1;
+                engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
+            }
+        } else {
+            if let Some(task) = self.task_queue.pop() {
+                self.task = Some(task);
+                self.num_tasks_advertised += 1;
+                engine.schedule(
+                    Exp::new(1.0 / Self::MEAN_TASK_ARRIVAL_TIME).sample(rng),
+                    Event::TaskAdvertisement(self.id),
                 );
             }
-        }
-
-        if let Some(task) = self.task_queue.pop() {
-            self.task = Some(task);
-            self.num_tasks_advertised += 1;
-
-            engine.schedule(
-                Exp::new(1.0 / Self::MEAN_TASK_ARRIVAL_TIME).sample(rng),
-                Event::TaskAdvertisement(self.id),
-            );
         }
     }
 
@@ -276,10 +273,7 @@ impl Requestor {
         Some(reported_usage * bid)
     }
 
-    pub fn complete_task<Rng>(&mut self, engine: &mut Engine<Event>, rng: &mut Rng)
-    where
-        Rng: rand::Rng,
-    {
+    pub fn complete_task(&mut self) {
         if self
             .task
             .as_ref()
@@ -290,50 +284,21 @@ impl Requestor {
 
             self.defence_mechanism.task_computed();
             self.num_tasks_computed += 1;
-            self.advertise(engine, rng);
-        } //else if self
-          // .task
-          // .as_ref()
-          // .expect(&format!("R{}:task not found", self.id))
-          // .is_pending()
-          // {
-          // self.num_readvertisements += 1;
-          // engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
-          // }
-    }
-
-    pub fn readvertise(&mut self, engine: &mut Engine<Event>) {
-        if self
-            .task
-            .as_ref()
-            .expect(&format!("R{}:task not found", self.id))
-            .is_pending()
-        {
-            self.num_readvertisements += 1;
-            engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
+            self.task = None;
         }
     }
 
-    pub fn budget_exceeded(
-        &mut self,
-        engine: &mut Engine<Event>,
-        provider_id: Id,
-        subtask: SubTask,
-    ) {
+    pub fn budget_exceeded(&mut self, provider_id: Id, subtask: SubTask) {
         debug!(
             "R{}:budget exceeded for {} by P{}",
             self.id, subtask, provider_id
         );
 
         self.num_subtasks_cancelled += 1;
-        self.num_readvertisements += 1;
-
         self.task
             .as_mut()
             .expect(&format!("R{}:task not found!", self.id))
             .push_subtask(subtask);
-
-        engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
     }
 
     pub fn into_stats(self, run_id: u64) -> Stats {
