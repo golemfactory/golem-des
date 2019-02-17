@@ -46,7 +46,10 @@ impl TaskQueue {
     fn pop(&mut self) -> Option<Task> {
         self.buffer.pop_front().map(|task| {
             if self.repeating {
-                self.buffer.push_back(task.replicate());
+                // FIX:ME clone will cause Id's to clone in the included
+                // SubTasks; need to look into a better way of handling
+                // this
+                self.buffer.push_back(task.clone());
             }
 
             task

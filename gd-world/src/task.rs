@@ -3,7 +3,7 @@ use std::fmt;
 
 use crate::id::Id;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Task {
     pub subtask_count: usize,
     pending: VecDeque<SubTask>,
@@ -19,15 +19,6 @@ impl Task {
             subtask_count: subtask_count,
             pending: (0..subtask_count).map(|_| generator()).collect(),
             done: VecDeque::with_capacity(subtask_count),
-        }
-    }
-
-    // WARN: will replicate current state of the Task!
-    pub fn replicate(&self) -> Task {
-        Task {
-            subtask_count: self.subtask_count,
-            pending: self.pending.iter().map(|s| s.replicate()).collect(),
-            done: self.done.iter().map(|s| s.replicate()).collect(),
         }
     }
 
@@ -77,14 +68,6 @@ impl SubTask {
             id: Id::new(),
             nominal_usage: nominal_usage,
             budget: budget,
-        }
-    }
-
-    fn replicate(&self) -> SubTask {
-        SubTask {
-            id: Id::new(),
-            nominal_usage: self.nominal_usage,
-            budget: self.budget,
         }
     }
 
