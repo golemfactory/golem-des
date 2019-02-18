@@ -1,5 +1,4 @@
 use gd_world::prelude::*;
-use gd_world::requestor::DefenceMechanismType;
 use serde_derive::Deserialize;
 
 use super::{Generator, ProviderBehaviour};
@@ -19,7 +18,6 @@ impl RequestorSpec {
     pub fn into_requestor<'a, Rng>(
         &self,
         rng: &'a mut Rng,
-        defence_mechanism_type: DefenceMechanismType,
     ) -> Requestor
     where
         Rng: rand::Rng,
@@ -29,7 +27,6 @@ impl RequestorSpec {
             self.max_price,
             self.budget_factor,
             self.repeating,
-            defence_mechanism_type,
         );
         requestor.append_tasks(
             self.tasks

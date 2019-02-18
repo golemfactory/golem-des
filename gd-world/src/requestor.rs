@@ -1,13 +1,10 @@
-mod defence;
-
-pub use self::defence::{CTasks, DefenceMechanism, DefenceMechanismType, LGRola, Redundancy};
-
 use std::cmp::Ordering;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 
 use gd_engine::Engine;
 use log::debug;
+use num_traits::{NumAssign, NumCast};
 use rand::distributions::Exp;
 use rand::prelude::*;
 use serde_derive::{Deserialize, Serialize};
@@ -15,6 +12,8 @@ use serde_derive::{Deserialize, Serialize};
 use crate::id::Id;
 use crate::task::{SubTask, Task};
 use crate::world::Event;
+
+const REDUNDANCY_FACTOR: usize = 2;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Stats {
@@ -46,14 +45,40 @@ impl TaskQueue {
     fn pop(&mut self) -> Option<Task> {
         self.buffer.pop_front().map(|task| {
             if self.repeating {
-                // FIX:ME clone will cause Id's to clone in the included
-                // SubTasks; need to look into a better way of handling
-                // this
                 self.buffer.push_back(task.clone());
             }
 
             task
         })
+    }
+}
+
+#[derive(Debug)]
+enum BanDuration<T>
+where
+    T: fmt::Debug + NumAssign + NumCast,
+{
+    Until(T),
+    Indefinitely,
+}
+
+impl<T> BanDuration<T>
+where
+    T: fmt::Debug + NumAssign + NumCast,
+{
+    fn is_expired(&self) -> bool {
+        match self {
+            BanDuration::Until(value) => {
+                *value == NumCast::from(0).expect("could not convert int to T")
+            }
+            BanDuration::Indefinitely => false,
+        }
+    }
+
+    fn decrement(&mut self) {
+        if let BanDuration::Until(ref mut value) = *self {
+            *value -= NumCast::from(1).expect("could not convert int to T")
+        }
     }
 }
 
@@ -64,7 +89,9 @@ pub struct Requestor {
     budget_factor: f64,
     task: Option<Task>,
     task_queue: TaskQueue,
-    defence_mechanism: Box<dyn DefenceMechanism>,
+    ratings: HashMap<Id, f64>,
+    blacklist: HashMap<Id, BanDuration<i64>>,
+    verification_map: HashMap<Id, Vec<Option<(Id, f64)>>>,
     mean_cost: (usize, f64),
     num_tasks_advertised: usize,
     num_tasks_computed: usize,
@@ -77,35 +104,20 @@ impl Requestor {
     const MEAN_TASK_ARRIVAL_TIME: f64 = 3600.0;
     const READVERT_DELAY: f64 = 60.0;
 
-    pub fn new(
-        max_price: f64,
-        budget_factor: f64,
-        repeating: bool,
-        defence_mechanism_type: DefenceMechanismType,
-    ) -> Requestor {
-        Requestor::with_id(
-            Id::new(),
-            max_price,
-            budget_factor,
-            repeating,
-            defence_mechanism_type,
-        )
+    pub fn new(max_price: f64, budget_factor: f64, repeating: bool) -> Requestor {
+        Requestor::with_id(Id::new(), max_price, budget_factor, repeating)
     }
 
-    pub fn with_id(
-        id: Id,
-        max_price: f64,
-        budget_factor: f64,
-        repeating: bool,
-        defence_mechanism_type: DefenceMechanismType,
-    ) -> Requestor {
+    pub fn with_id(id: Id, max_price: f64, budget_factor: f64, repeating: bool) -> Requestor {
         Requestor {
             id: id,
             max_price: max_price,
             budget_factor: budget_factor,
             task: None,
             task_queue: TaskQueue::new(repeating),
-            defence_mechanism: defence_mechanism_type.into_dm(id),
+            ratings: HashMap::new(),
+            blacklist: HashMap::new(),
+            verification_map: HashMap::new(),
             mean_cost: (0, 0.0),
             num_tasks_advertised: 0,
             num_tasks_computed: 0,
@@ -159,19 +171,37 @@ impl Requestor {
     }
 
     pub fn receive_benchmark(&mut self, provider_id: &Id, reported_usage: f64) {
-        self.defence_mechanism
-            .insert_provider_rating(provider_id, reported_usage);
+        if let Some(_) = self.ratings.insert(*provider_id, reported_usage) {
+            panic!("R{}:rating for P{} already existed!", self.id, provider_id);
+        }
     }
 
     pub fn select_offers(&mut self, bids: Vec<(Id, f64)>) -> Vec<(Id, SubTask, f64)> {
         let mut bids = self.filter_offers(bids);
         self.rank_offers(&mut bids);
-        self.defence_mechanism.schedule_subtasks(
-            self.task
-                .as_mut()
-                .expect(&format!("R{}:task not found", self.id)),
-            bids,
-        )
+
+        let mut messages: Vec<(Id, SubTask, f64)> = Vec::new();
+
+        for chunk in bids.chunks_exact(REDUNDANCY_FACTOR) {
+            match self.task.as_mut().unwrap().pop_subtask() {
+                Some(subtask) => {
+                    for &(provider_id, bid) in chunk {
+                        debug!(
+                            "R{}:sending {} to P{} for {}",
+                            self.id, subtask, provider_id, bid
+                        );
+
+                        messages.push((provider_id, subtask, bid));
+                    }
+
+                    self.verification_map
+                        .insert(subtask.id(), Vec::with_capacity(REDUNDANCY_FACTOR));
+                }
+                None => break,
+            }
+        }
+
+        messages
     }
 
     fn filter_offers(&mut self, bids: Vec<(Id, f64)>) -> Vec<(Id, f64)> {
@@ -185,7 +215,7 @@ impl Requestor {
 
         let bids: Vec<(Id, f64)> = bids
             .into_iter()
-            .filter(|(id, _)| !self.defence_mechanism.is_blacklisted(&id))
+            .filter(|(id, _)| !self.blacklist.contains_key(&id))
             .collect();
 
         debug!(
@@ -201,11 +231,11 @@ impl Requestor {
 
     fn rank_offers(&self, bids: &mut Vec<(Id, f64)>) {
         bids.sort_unstable_by(|(x_id, x_bid), (y_id, y_bid)| {
-            let x_usage = self.defence_mechanism.get_rating(x_id).expect(&format!(
+            let x_usage = self.ratings.get(&x_id).expect(&format!(
                 "R{}: usage rating for P{} not found",
                 self.id, x_id
             ));
-            let y_usage = self.defence_mechanism.get_rating(y_id).expect(&format!(
+            let y_usage = self.ratings.get(&y_id).expect(&format!(
                 "R{}: usage rating for P{} not found",
                 self.id, y_id
             ));
@@ -223,6 +253,30 @@ impl Requestor {
         });
     }
 
+    fn update_rating(&mut self, p1: (Id, f64), p2: (Id, f64)) {
+        let (id1, d1) = p1;
+        let (_, d2) = p2;
+        let usage_factor = self.ratings.get_mut(&id1).expect(&format!(
+            "R{}:usage rating for P{} not found!",
+            self.id, id1
+        ));
+        let old_rating = *usage_factor;
+        *usage_factor *= d1 / d2;
+
+        debug!(
+            "R{}:P{} failed verification, rating {} => {}",
+            self.id, id1, old_rating, *usage_factor
+        );
+
+        if *usage_factor >= 2.0 {
+            let duration = BanDuration::Indefinitely;
+
+            debug!("R{}:P{} blacklisted for {:?}", self.id, id1, duration);
+
+            self.blacklist.insert(id1, duration);
+        }
+    }
+
     pub fn verify_subtask(
         &mut self,
         provider_id: Id,
@@ -230,26 +284,33 @@ impl Requestor {
         bid: f64,
         reported_usage: f64,
     ) {
-        debug!("R{}:{} computed by P{}", self.id, subtask, provider_id);
+        debug!("R{}:verifying {}", self.id, subtask);
 
-        let payment = reported_usage * bid;
+        let rating = self.ratings.get(&provider_id).unwrap();
+        self.verification_map
+            .get_mut(&subtask.id())
+            .unwrap()
+            .push(Some((provider_id, reported_usage / rating)));
 
-        debug!("R{}:for {}, incurred cost {}", self.id, subtask, payment);
+        if self.verification_map.get(&subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
+            return;
+        }
 
-        self.defence_mechanism
-            .subtask_computed(&subtask, &provider_id, reported_usage, bid);
+        let vers: Vec<(Id, f64)> = self
+            .verification_map
+            .remove(&subtask.id())
+            .unwrap()
+            .into_iter()
+            .filter_map(|v| v)
+            .collect();
 
-        let (count, current_mean) = &mut self.mean_cost;
-        let current_cost_wrt_budget = bid * reported_usage / subtask.budget;
-        *count += 1;
-        *current_mean = *current_mean + (current_cost_wrt_budget - *current_mean) / (*count as f64);
-
-        debug!(
-            "R{}:current cost wrt budget = {}%, average cost wrt budget = {}%",
-            self.id,
-            current_cost_wrt_budget * 100.0,
-            *current_mean * 100.0,
-        );
+        if vers.len() == 2 {
+            if vers[0].1 > vers[1].1 {
+                self.update_rating(vers[0], vers[1]);
+            } else {
+                self.update_rating(vers[1], vers[0]);
+            }
+        }
 
         self.num_subtasks_computed += 1;
         self.task
@@ -265,15 +326,29 @@ impl Requestor {
         bid: f64,
         reported_usage: f64,
     ) -> Option<f64> {
+        debug!("R{}:{} computed by P{}", self.id, subtask, provider_id);
+
+        let payment = reported_usage * bid;
+
+        debug!("R{}:for {}, incurred cost {}", self.id, subtask, payment);
+
+        let (count, current_mean) = &mut self.mean_cost;
+        let current_cost_wrt_budget = bid * reported_usage / subtask.budget;
+        *count += 1;
+        *current_mean = *current_mean + (current_cost_wrt_budget - *current_mean) / (*count as f64);
+
+        debug!(
+            "R{}:current cost wrt budget = {}%, average cost wrt budget = {}%",
+            self.id,
+            current_cost_wrt_budget * 100.0,
+            *current_mean * 100.0,
+        );
         debug!(
             "R{}:sending payment {} for {} to P{}",
-            self.id,
-            reported_usage * bid,
-            subtask,
-            provider_id
+            self.id, payment, subtask, provider_id
         );
 
-        Some(reported_usage * bid)
+        Some(payment)
     }
 
     pub fn complete_task(&mut self) {
@@ -285,7 +360,6 @@ impl Requestor {
         {
             debug!("R{}:task computed", self.id);
 
-            self.defence_mechanism.task_computed();
             self.num_tasks_computed += 1;
             self.task = None;
         }
@@ -297,11 +371,36 @@ impl Requestor {
             self.id, subtask, provider_id
         );
 
-        self.num_subtasks_cancelled += 1;
-        self.task
-            .as_mut()
-            .expect(&format!("R{}:task not found!", self.id))
-            .push_subtask(subtask);
+        self.verification_map
+            .get_mut(&subtask.id())
+            .unwrap()
+            .push(None);
+
+        if self.verification_map.get(&subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
+            return;
+        }
+
+        let vers: Vec<(Id, f64)> = self
+            .verification_map
+            .remove(&subtask.id())
+            .unwrap()
+            .into_iter()
+            .filter_map(|v| v)
+            .collect();
+
+        if vers.len() > 0 {
+            self.num_subtasks_computed += 1;
+            self.task
+                .as_mut()
+                .expect(&format!("R{}:task not found!", self.id))
+                .subtask_computed(subtask);
+        } else {
+            self.num_subtasks_cancelled += 1;
+            self.task
+                .as_mut()
+                .expect(&format!("R{}:task not found!", self.id))
+                .push_subtask(subtask);
+        }
     }
 
     pub fn into_stats(self, run_id: u64) -> Stats {
