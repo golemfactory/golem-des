@@ -1,5 +1,4 @@
 use gd_world::prelude::*;
-use gd_world::requestor::DefenceMechanismType;
 use serde_derive::Deserialize;
 
 use super::{Generator, ProviderBehaviour};
@@ -17,7 +16,6 @@ impl RequestorSource {
     pub fn iter<'a, Rng>(
         &'a self,
         rng: &'a mut Rng,
-        defence_mechanism_type: DefenceMechanismType,
     ) -> RequestorSourceIter<Rng>
     where
         Rng: rand::Rng,
@@ -26,7 +24,6 @@ impl RequestorSource {
             count: 0,
             source: self,
             rng: rng,
-            defence_mechanism_type: defence_mechanism_type,
         }
     }
 }
@@ -39,7 +36,6 @@ where
     count: usize,
     source: &'a RequestorSource,
     rng: &'a mut Rng,
-    defence_mechanism_type: DefenceMechanismType,
 }
 
 impl<'a, Rng> Iterator for RequestorSourceIter<'a, Rng>
@@ -59,7 +55,6 @@ where
             self.source.max_price.sample(self.rng),
             self.source.budget_factor.sample(self.rng),
             true,
-            self.defence_mechanism_type,
         );
         let task = Task::new(
             self.source.subtask_count.sample(self.rng).round() as usize,

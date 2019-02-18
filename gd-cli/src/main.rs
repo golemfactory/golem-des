@@ -9,7 +9,6 @@ use rand_chacha::ChaChaRng;
 use rayon::prelude::*;
 use serde_derive::Deserialize;
 use gd_world::prelude::*;
-use gd_world::requestor::DefenceMechanismType;
 use gd_world::requestor::Stats as RStats;
 use gd_world::provider::Stats as PStats;
 use gd_world::logger as logger;
@@ -22,14 +21,13 @@ const USAGE: &'static str = "
 Golem marketplace agent-based DES simulator
 
 Usage:
-    golem_des <json> [--defence=<defence>] [--repetitions=<repetitions>] [--output-dir=<output-dir>] [--verbose]
+    golem_des <json> [--repetitions=<repetitions>] [--output-dir=<output-dir>] [--verbose]
     golem_des (-h | --help)
 
 Options:
     json                            JSON file with simulation parameters.
     -v --verbose                    Show debug logs.
     -h --help                       Show this screen.
-    --defence=<defence>             Defence mechanism (ctasks, lgrola or redundancy) [default: ctasks].
     --repetitions=<repetitions>     Number of repetitions [default: 100].
     --output-dir=<output-dir>       Output directory for statistics.
 ";
@@ -37,7 +35,6 @@ Options:
 #[derive(Debug, Deserialize)]
 struct Args {
     arg_json: String,
-    flag_defence: DefenceMechanismType,
     flag_repetitions: usize,
     flag_verbose: bool,
     flag_output_dir: Option<String>,
@@ -71,7 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // create pre-specified actors
             if let Some(rs) = &params.requestors {
                 for spec in rs {
-                    requestors.push(spec.into_requestor(&mut rng, args.flag_defence));
+                    requestors.push(spec.into_requestor(&mut rng));
                 }
             }
 
@@ -84,7 +81,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // create random actors
             if let Some(sources) = &params.requestor_sources {
                 for source in sources {
-                    for requestor in source.iter(&mut rng, args.flag_defence) {
+                    for requestor in source.iter(&mut rng) {
                         requestors.push(requestor);
                     }
                 }

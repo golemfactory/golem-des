@@ -3,7 +3,7 @@ use std::fmt;
 
 use crate::id::Id;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Task {
     pub subtask_count: usize,
     pending: VecDeque<SubTask>,
