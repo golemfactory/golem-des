@@ -117,8 +117,8 @@ impl ProviderCommon {
         }
     }
 
-    pub fn id(&self) -> Id {
-        self.id
+    pub fn id(&self) -> &Id {
+        &self.id
     }
 
     pub fn usage_factor(&self) -> f64 {
@@ -164,8 +164,8 @@ impl ProviderCommon {
         &mut self,
         engine: &mut Engine<Event>,
         _rng: &mut Rng,
-        requestor_id: Id,
-        subtask: SubTask,
+        subtask: &SubTask,
+        requestor_id: &Id,
         bid: f64,
     ) where
         Rng: rand::Rng,
@@ -183,18 +183,18 @@ impl ProviderCommon {
             // schedule budget exceeded event
             engine.schedule(
                 subtask.budget / bid,
-                Event::SubTaskBudgetExceeded(subtask, requestor_id, self.id),
+                Event::SubTaskBudgetExceeded(*subtask, *requestor_id, self.id),
             );
         } else {
             // schedule subtask computed event
             engine.schedule(
                 expected_usage,
-                Event::SubTaskComputed(subtask, requestor_id, self.id, bid),
+                Event::SubTaskComputed(*subtask, *requestor_id, self.id, bid),
             );
         }
     }
 
-    pub fn finish_computing(&mut self, now: f64, requestor_id: Id, subtask: SubTask) {
+    pub fn finish_computing(&mut self, now: f64, subtask: &SubTask, requestor_id: &Id) {
         debug!(
             "P{}:finished computing {} of R{}",
             self.id, subtask, requestor_id,
@@ -207,7 +207,7 @@ impl ProviderCommon {
         self.last_checkpoint = now;
     }
 
-    pub fn receive_payment(&mut self, requestor_id: Id, subtask: SubTask, payment: Option<f64>) {
+    pub fn receive_payment(&mut self, subtask: &SubTask, requestor_id: &Id, payment: Option<f64>) {
         match payment {
             Some(payment) => {
                 debug!(
@@ -223,7 +223,7 @@ impl ProviderCommon {
         }
     }
 
-    pub fn cancel_computing(&mut self, now: f64, requestor_id: Id, subtask: SubTask) {
+    pub fn cancel_computing(&mut self, now: f64, subtask: &SubTask, requestor_id: &Id) {
         debug!(
             "P{}:budget exceeded for {} of R{}",
             self.id, subtask, requestor_id

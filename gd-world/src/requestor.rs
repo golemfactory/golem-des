@@ -53,6 +53,7 @@ impl TaskQueue {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 enum BanDuration<T>
 where
@@ -62,6 +63,7 @@ where
     Indefinitely,
 }
 
+#[allow(dead_code)]
 impl<T> BanDuration<T>
 where
     T: fmt::Debug + NumAssign + NumCast,
@@ -127,8 +129,8 @@ impl Requestor {
         }
     }
 
-    pub fn id(&self) -> Id {
-        self.id
+    pub fn id(&self) -> &Id {
+        &self.id
     }
 
     pub fn max_price(&self) -> f64 {
@@ -195,7 +197,7 @@ impl Requestor {
                     }
 
                     self.verification_map
-                        .insert(subtask.id(), Vec::with_capacity(REDUNDANCY_FACTOR));
+                        .insert(*subtask.id(), Vec::with_capacity(REDUNDANCY_FACTOR));
                 }
                 None => break,
             }
@@ -279,26 +281,26 @@ impl Requestor {
 
     pub fn verify_subtask(
         &mut self,
-        provider_id: Id,
-        subtask: SubTask,
-        bid: f64,
+        subtask: &SubTask,
+        provider_id: &Id,
+        _bid: f64,
         reported_usage: f64,
     ) {
         debug!("R{}:verifying {}", self.id, subtask);
 
         let rating = self.ratings.get(&provider_id).unwrap();
         self.verification_map
-            .get_mut(&subtask.id())
+            .get_mut(subtask.id())
             .unwrap()
-            .push(Some((provider_id, reported_usage / rating)));
+            .push(Some((*provider_id, reported_usage / rating)));
 
-        if self.verification_map.get(&subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
+        if self.verification_map.get(subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
             return;
         }
 
         let vers: Vec<(Id, f64)> = self
             .verification_map
-            .remove(&subtask.id())
+            .remove(subtask.id())
             .unwrap()
             .into_iter()
             .filter_map(|v| v)
@@ -316,13 +318,13 @@ impl Requestor {
         self.task
             .as_mut()
             .expect(&format!("R{}:task not found!", self.id))
-            .subtask_computed(subtask);
+            .subtask_computed(*subtask);
     }
 
     pub fn send_payment(
         &mut self,
-        provider_id: Id,
-        subtask: SubTask,
+        subtask: &SubTask,
+        provider_id: &Id,
         bid: f64,
         reported_usage: f64,
     ) -> Option<f64> {
@@ -365,24 +367,24 @@ impl Requestor {
         }
     }
 
-    pub fn budget_exceeded(&mut self, provider_id: Id, subtask: SubTask) {
+    pub fn budget_exceeded(&mut self, subtask: &SubTask, provider_id: &Id) {
         debug!(
             "R{}:budget exceeded for {} by P{}",
             self.id, subtask, provider_id
         );
 
         self.verification_map
-            .get_mut(&subtask.id())
+            .get_mut(subtask.id())
             .unwrap()
             .push(None);
 
-        if self.verification_map.get(&subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
+        if self.verification_map.get(subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
             return;
         }
 
         let vers: Vec<(Id, f64)> = self
             .verification_map
-            .remove(&subtask.id())
+            .remove(subtask.id())
             .unwrap()
             .into_iter()
             .filter_map(|v| v)
@@ -393,13 +395,13 @@ impl Requestor {
             self.task
                 .as_mut()
                 .expect(&format!("R{}:task not found!", self.id))
-                .subtask_computed(subtask);
+                .subtask_computed(*subtask);
         } else {
             self.num_subtasks_cancelled += 1;
             self.task
                 .as_mut()
                 .expect(&format!("R{}:task not found!", self.id))
-                .push_subtask(subtask);
+                .push_subtask(*subtask);
         }
     }
 
