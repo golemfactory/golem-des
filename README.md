@@ -1,5 +1,6 @@
 golem-des
 ---
+[![Build Status](https://travis-ci.org/golemfactory/golem-des.svg?branch=master)](https://travis-ci.org/golemfactory/golem-des)
 
 Golem-des is a Golem marketplace agent-based DES simulation package. It is currently designed to simulate the market with usages that will be standard in Golem with Golem Clay release.
 
