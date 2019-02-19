@@ -4,11 +4,13 @@ use std::fmt;
 use crate::id::Id;
 use crate::task::SubTask;
 
+#[derive(PartialEq)]
 pub enum SimulationError {
     RequestorNotFound(Id),
     ProviderNotFound(Id),
     TaskNotFound(Id),
     RatingNotFound(Id, Id),
+    RatingAlreadyExists(Id, Id),
     VerificationForSubtaskNotFound(Id, SubTask),
 }
 
@@ -20,6 +22,9 @@ impl fmt::Debug for SimulationError {
             SimulationError::TaskNotFound(id) => format!("R{}:task not found", id),
             SimulationError::RatingNotFound(r_id, p_id) => {
                 format!("R{}:rating for P{} not found", r_id, p_id)
+            }
+            SimulationError::RatingAlreadyExists(r_id, p_id) => {
+                format!("R{}:rating for P{} already exists", r_id, p_id)
             }
             SimulationError::VerificationForSubtaskNotFound(id, subtask) => {
                 format!("R{}:verification for {} not found", id, subtask)

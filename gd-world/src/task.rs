@@ -3,23 +3,33 @@ use std::fmt;
 
 use crate::id::Id;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Task {
-    pub subtask_count: usize,
+    size: usize,
     pending: VecDeque<SubTask>,
     done: VecDeque<SubTask>,
 }
 
 impl Task {
-    pub fn new<F>(subtask_count: usize, mut generator: F) -> Task
-    where
-        F: FnMut() -> SubTask,
-    {
+    pub fn new() -> Task {
         Task {
-            subtask_count: subtask_count,
-            pending: (0..subtask_count).map(|_| generator()).collect(),
-            done: VecDeque::with_capacity(subtask_count),
+            size: 0,
+            pending: VecDeque::new(),
+            done: VecDeque::new(),
         }
+    }
+
+    pub fn push_pending(&mut self, subtask: SubTask) {
+        self.size += 1;
+        self.pending.push_back(subtask);
+    }
+
+    pub fn pop_pending(&mut self) -> Option<SubTask> {
+        self.pending.pop_front()
+    }
+
+    pub fn push_done(&mut self, subtask: SubTask) {
+        self.done.push_back(subtask)
     }
 
     pub fn is_pending(&self) -> bool {
@@ -27,19 +37,7 @@ impl Task {
     }
 
     pub fn is_done(&self) -> bool {
-        self.done.len() == self.subtask_count
-    }
-
-    pub fn pop_subtask(&mut self) -> Option<SubTask> {
-        self.pending.pop_front()
-    }
-
-    pub fn push_subtask(&mut self, subtask: SubTask) {
-        self.pending.push_back(subtask)
-    }
-
-    pub fn subtask_computed(&mut self, subtask: SubTask) {
-        self.done.push_back(subtask)
+        self.done.len() == self.size
     }
 }
 
@@ -48,7 +46,7 @@ impl std::fmt::Display for Task {
         write!(
             f,
             "Task({}, {}, {})",
-            self.subtask_count,
+            self.size,
             self.pending.len(),
             self.done.len(),
         )
@@ -83,5 +81,11 @@ impl std::fmt::Display for SubTask {
             "SubTask({}, {}, {})",
             self.id, self.nominal_usage, self.budget
         )
+    }
+}
+
+impl PartialEq for SubTask {
+    fn eq(&self, other: &SubTask) -> bool {
+        self.id == other.id
     }
 }
