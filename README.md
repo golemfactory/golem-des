@@ -16,14 +16,12 @@ $ sudo apt-get install gnuplot libgsl23 libgsl-dev
 The shipped, basic version of the simulator's CLI can be executed from the command line as follows (here, we assume you're at the top of the crate, i.e., in `golem-des`)
 
 ```
-$ ./target/release/run <some-simulation-scenario-in-json> --repetitions=100 --defence=ctasks --output-dir=<output-dir>
+$ ./target/release/run <some-simulation-scenario-in-json> --repetitions=100 --output-dir=<output-dir>
 ```
 
-Firstly, by default, the simulator will repeat the scenario for 100 times, hence, `--repetitions` can be omitted unless you want to run the simulation for a specific number of times.
+By default, the simulator will repeat the scenario for 100 times, hence, `--repetitions` can be omitted unless you want to run the simulation for a specific number of times.
 
-Secondly, the simulator assumes that the requestors defend themeselves from malicious providers using a CTasks defence mechanism. If you want to test a different defence mechanism, you can specify it via `--defence` flag which accepts the following values: `ctasks`, `lgrola`, and `redundancy`.
-
-Lastly, the simulator will save the resultant statistics in the current working directory. If you want to specify an alternative directory, pass it as an optional argument `--output-dir`.
+The simulator will save the resultant statistics in the current working directory. If you want to specify an alternative directory, pass it as an optional argument `--output-dir`.
 
 ### Specifying the simulation scenario
 The only required argument for the simulator is the simulation scenario in JSON format as evidenced in the example invocation above. Several example scenarios in JSON format can be found in [scenarios/](scenarios) directory. However, the general structure can be summarised as follows
