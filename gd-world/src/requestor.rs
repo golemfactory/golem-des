@@ -9,6 +9,7 @@ use rand::distributions::Exp;
 use rand::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
+use crate::error::SimulationError;
 use crate::id::Id;
 use crate::task::{SubTask, Task};
 use crate::world::Event;
@@ -178,14 +179,22 @@ impl Requestor {
         }
     }
 
-    pub fn select_offers(&mut self, bids: Vec<(Id, f64)>) -> Vec<(Id, SubTask, f64)> {
+    pub fn select_offers(
+        &mut self,
+        bids: Vec<(Id, f64)>,
+    ) -> Result<Vec<(Id, SubTask, f64)>, SimulationError> {
         let mut bids = self.filter_offers(bids);
-        self.rank_offers(&mut bids);
+        bids = self.rank_offers(bids)?;
 
         let mut messages: Vec<(Id, SubTask, f64)> = Vec::new();
 
         for chunk in bids.chunks_exact(REDUNDANCY_FACTOR) {
-            match self.task.as_mut().unwrap().pop_subtask() {
+            match self
+                .task
+                .as_mut()
+                .ok_or(SimulationError::TaskNotFound(self.id))?
+                .pop_subtask()
+            {
                 Some(subtask) => {
                     for &(provider_id, bid) in chunk {
                         debug!(
@@ -203,7 +212,7 @@ impl Requestor {
             }
         }
 
-        messages
+        Ok(messages)
     }
 
     fn filter_offers(&mut self, bids: Vec<(Id, f64)>) -> Vec<(Id, f64)> {
@@ -231,19 +240,22 @@ impl Requestor {
         bids
     }
 
-    fn rank_offers(&self, bids: &mut Vec<(Id, f64)>) {
-        bids.sort_unstable_by(|(x_id, x_bid), (y_id, y_bid)| {
-            let x_usage = self.ratings.get(&x_id).expect(&format!(
-                "R{}: usage rating for P{} not found",
-                self.id, x_id
-            ));
-            let y_usage = self.ratings.get(&y_id).expect(&format!(
-                "R{}: usage rating for P{} not found",
-                self.id, y_id
-            ));
+    fn rank_offers(&self, bids: Vec<(Id, f64)>) -> Result<Vec<(Id, f64)>, SimulationError> {
+        let bids_with_ratings: Result<Vec<(Id, f64, f64)>, SimulationError> = bids
+            .into_iter()
+            .map(|(id, bid)| {
+                let rating = self
+                    .ratings
+                    .get(&id)
+                    .ok_or(SimulationError::RatingNotFound(self.id, id))?;
+                Ok((id, bid, *rating))
+            })
+            .collect();
 
-            let x_price = x_bid * x_usage;
-            let y_price = y_bid * y_usage;
+        let mut sorted_bids = bids_with_ratings?;
+        sorted_bids.sort_unstable_by(|(_, x_bid, x_rating), (_, y_bid, y_rating)| {
+            let x_price = x_bid * x_rating;
+            let y_price = y_bid * y_rating;
 
             if x_price < y_price {
                 Ordering::Less
@@ -253,15 +265,20 @@ impl Requestor {
                 Ordering::Equal
             }
         });
+
+        Ok(sorted_bids
+            .into_iter()
+            .map(|(id, bid, _)| (id, bid))
+            .collect())
     }
 
-    fn update_rating(&mut self, p1: (Id, f64), p2: (Id, f64)) {
+    fn update_rating(&mut self, p1: (Id, f64), p2: (Id, f64)) -> Result<(), SimulationError> {
         let (id1, d1) = p1;
         let (_, d2) = p2;
-        let usage_factor = self.ratings.get_mut(&id1).expect(&format!(
-            "R{}:usage rating for P{} not found!",
-            self.id, id1
-        ));
+        let usage_factor = self
+            .ratings
+            .get_mut(&id1)
+            .ok_or(SimulationError::RatingNotFound(self.id, id1))?;
         let old_rating = *usage_factor;
         *usage_factor *= d1 / d2;
 
@@ -277,6 +294,8 @@ impl Requestor {
 
             self.blacklist.insert(id1, duration);
         }
+
+        Ok(())
     }
 
     pub fn verify_subtask(
@@ -285,40 +304,49 @@ impl Requestor {
         provider_id: &Id,
         _bid: f64,
         reported_usage: f64,
-    ) {
+    ) -> Result<(), SimulationError> {
         debug!("R{}:verifying {}", self.id, subtask);
 
-        let rating = self.ratings.get(&provider_id).unwrap();
+        let rating = self
+            .ratings
+            .get(&provider_id)
+            .ok_or(SimulationError::RatingNotFound(self.id, *provider_id))?;
         self.verification_map
             .get_mut(subtask.id())
-            .unwrap()
+            .ok_or(SimulationError::VerificationForSubtaskNotFound(
+                self.id, *subtask,
+            ))?
             .push(Some((*provider_id, reported_usage / rating)));
 
         if self.verification_map.get(subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
-            return;
+            return Ok(());
         }
 
         let vers: Vec<(Id, f64)> = self
             .verification_map
             .remove(subtask.id())
-            .unwrap()
+            .ok_or(SimulationError::VerificationForSubtaskNotFound(
+                self.id, *subtask,
+            ))?
             .into_iter()
             .filter_map(|v| v)
             .collect();
 
         if vers.len() == 2 {
             if vers[0].1 > vers[1].1 {
-                self.update_rating(vers[0], vers[1]);
+                self.update_rating(vers[0], vers[1])?;
             } else {
-                self.update_rating(vers[1], vers[0]);
+                self.update_rating(vers[1], vers[0])?;
             }
         }
 
         self.num_subtasks_computed += 1;
         self.task
             .as_mut()
-            .expect(&format!("R{}:task not found!", self.id))
+            .ok_or(SimulationError::TaskNotFound(self.id))?
             .subtask_computed(*subtask);
+
+        Ok(())
     }
 
     pub fn send_payment(
@@ -353,11 +381,11 @@ impl Requestor {
         Some(payment)
     }
 
-    pub fn complete_task(&mut self) {
+    pub fn complete_task(&mut self) -> Result<(), SimulationError> {
         if self
             .task
             .as_ref()
-            .expect(&format!("R{}:task not found", self.id))
+            .ok_or(SimulationError::TaskNotFound(self.id))?
             .is_done()
         {
             debug!("R{}:task computed", self.id);
@@ -365,9 +393,15 @@ impl Requestor {
             self.num_tasks_computed += 1;
             self.task = None;
         }
+
+        Ok(())
     }
 
-    pub fn budget_exceeded(&mut self, subtask: &SubTask, provider_id: &Id) {
+    pub fn budget_exceeded(
+        &mut self,
+        subtask: &SubTask,
+        provider_id: &Id,
+    ) -> Result<(), SimulationError> {
         debug!(
             "R{}:budget exceeded for {} by P{}",
             self.id, subtask, provider_id
@@ -375,17 +409,29 @@ impl Requestor {
 
         self.verification_map
             .get_mut(subtask.id())
-            .unwrap()
+            .ok_or(SimulationError::VerificationForSubtaskNotFound(
+                self.id, *subtask,
+            ))?
             .push(None);
 
-        if self.verification_map.get(subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
-            return;
+        if self
+            .verification_map
+            .get(subtask.id())
+            .ok_or(SimulationError::VerificationForSubtaskNotFound(
+                self.id, *subtask,
+            ))?
+            .len()
+            < REDUNDANCY_FACTOR
+        {
+            return Ok(());
         }
 
         let vers: Vec<(Id, f64)> = self
             .verification_map
             .remove(subtask.id())
-            .unwrap()
+            .ok_or(SimulationError::VerificationForSubtaskNotFound(
+                self.id, *subtask,
+            ))?
             .into_iter()
             .filter_map(|v| v)
             .collect();
@@ -394,15 +440,17 @@ impl Requestor {
             self.num_subtasks_computed += 1;
             self.task
                 .as_mut()
-                .expect(&format!("R{}:task not found!", self.id))
+                .ok_or(SimulationError::TaskNotFound(self.id))?
                 .subtask_computed(*subtask);
         } else {
             self.num_subtasks_cancelled += 1;
             self.task
                 .as_mut()
-                .expect(&format!("R{}:task not found!", self.id))
+                .ok_or(SimulationError::TaskNotFound(self.id))?
                 .push_subtask(*subtask);
         }
+
+        Ok(())
     }
 
     pub fn into_stats(self, run_id: u64) -> Stats {
