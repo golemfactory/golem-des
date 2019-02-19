@@ -4,12 +4,13 @@ use gd_engine::Engine;
 use log::debug;
 use rand::seq::SliceRandom;
 
+use crate::error::SimulationError;
 use crate::id::Id;
 use crate::provider;
 use crate::provider::Provider;
 use crate::requestor;
 use crate::requestor::Requestor;
-use crate::task::*;
+use crate::task::SubTask;
 
 #[derive(Debug)]
 pub enum Event {
@@ -85,8 +86,8 @@ where
         )
     }
 
-    pub fn run(&mut self, until: f64) {
-        self.started();
+    pub fn run(&mut self, until: f64) -> Result<(), SimulationError> {
+        self.started()?;
 
         while let Some(payload) = self.engine.next() {
             let now = self.engine.now();
@@ -96,17 +97,19 @@ where
             }
 
             debug!("W:now = {}", now);
-            self.handle(payload);
+            self.handle(payload)?;
         }
 
         self.stopped();
+
+        Ok(())
     }
 
-    fn handle_advertise(&mut self, requestor_id: Id) {
+    fn handle_advertise(&mut self, requestor_id: Id) -> Result<(), SimulationError> {
         let requestor = self
             .requestors
             .get_mut(&requestor_id)
-            .expect("W:requestor not found!");
+            .ok_or(SimulationError::RequestorNotFound(requestor_id))?;
 
         // collect offers
         let mut bids = Vec::new();
@@ -117,55 +120,78 @@ where
         }
 
         // select offers
-        for (provider_id, subtask, bid) in requestor.select_offers(bids) {
+        for (provider_id, subtask, bid) in requestor.select_offers(bids)? {
             let provider = self
                 .providers
                 .get_mut(&provider_id)
-                .expect("W:provider not found!");
+                .ok_or(SimulationError::ProviderNotFound(provider_id))?;
 
-            provider.receive_subtask(&mut self.engine, &mut self.rng, &subtask, &requestor_id, bid);
+            provider.receive_subtask(
+                &mut self.engine,
+                &mut self.rng,
+                &subtask,
+                &requestor_id,
+                bid,
+            );
         }
+
+        Ok(())
     }
 
-    fn handle_compute(&mut self, subtask: SubTask, requestor_id: Id, provider_id: Id, bid: f64) {
+    fn handle_compute(
+        &mut self,
+        subtask: SubTask,
+        requestor_id: Id,
+        provider_id: Id,
+        bid: f64,
+    ) -> Result<(), SimulationError> {
         let requestor = self
             .requestors
             .get_mut(&requestor_id)
-            .expect("W:requestor not found!");
+            .ok_or(SimulationError::RequestorNotFound(requestor_id))?;
 
         let provider = self
             .providers
             .get_mut(&provider_id)
-            .expect("W:provider not found");
+            .ok_or(SimulationError::ProviderNotFound(provider_id))?;
 
         provider.finish_computing(self.engine.now(), &subtask, &requestor_id);
         let reported_usage = provider.report_usage(&subtask, bid);
-        requestor.verify_subtask(&subtask, &provider_id, bid, reported_usage);
+        requestor.verify_subtask(&subtask, &provider_id, bid, reported_usage)?;
         let payment = requestor.send_payment(&subtask, &provider_id, bid, reported_usage);
         provider.receive_payment(&subtask, &requestor_id, payment);
-        requestor.complete_task();
+        requestor.complete_task()?;
 
-        self.schedule_advertise();
+        self.schedule_advertise()?;
+
+        Ok(())
     }
 
-    fn handle_budget_exceeded(&mut self, subtask: SubTask, requestor_id: Id, provider_id: Id) {
+    fn handle_budget_exceeded(
+        &mut self,
+        subtask: SubTask,
+        requestor_id: Id,
+        provider_id: Id,
+    ) -> Result<(), SimulationError> {
         let requestor = self
             .requestors
             .get_mut(&requestor_id)
-            .expect("W:requestor not found");
+            .ok_or(SimulationError::RequestorNotFound(requestor_id))?;
 
         let provider = self
             .providers
             .get_mut(&provider_id)
-            .expect("W:provider not found");
+            .ok_or(SimulationError::ProviderNotFound(provider_id))?;
 
         provider.cancel_computing(self.engine.now(), &subtask, &requestor_id);
-        requestor.budget_exceeded(&subtask, &provider_id);
+        requestor.budget_exceeded(&subtask, &provider_id)?;
 
-        self.schedule_advertise();
+        self.schedule_advertise()?;
+
+        Ok(())
     }
 
-    fn handle(&mut self, event: Event) {
+    fn handle(&mut self, event: Event) -> Result<(), SimulationError> {
         match event {
             Event::TaskAdvertisement(requestor_id) => self.handle_advertise(requestor_id),
             Event::SubTaskComputed(subtask, requestor_id, provider_id, bid) => {
@@ -177,7 +203,7 @@ where
         }
     }
 
-    fn started(&mut self) {
+    fn started(&mut self) -> Result<(), SimulationError> {
         // collect benchmarks
         let usage_factors: Vec<(Id, f64)> = self
             .providers
@@ -191,9 +217,11 @@ where
             }
         }
 
-        self.schedule_advertise();
+        self.schedule_advertise()?;
 
         debug!("W:simulation started");
+
+        Ok(())
     }
 
     fn stopped(&self) {
@@ -208,7 +236,7 @@ where
         }
     }
 
-    fn schedule_advertise(&mut self) {
+    fn schedule_advertise(&mut self) -> Result<(), SimulationError> {
         // shuffle requestors
         let mut ids: Vec<Id> = self.requestors.keys().cloned().collect();
         ids.shuffle(&mut self.rng);
@@ -216,8 +244,10 @@ where
         for id in ids {
             self.requestors
                 .get_mut(&id)
-                .expect("W:requestor not found")
+                .ok_or(SimulationError::RequestorNotFound(id))?
                 .advertise(&mut self.engine, &mut self.rng);
         }
+
+        Ok(())
     }
 }

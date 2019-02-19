@@ -4,14 +4,14 @@ use std::path::Path;
 
 use csv::Writer;
 use docopt::Docopt;
+use gd_world::logger;
+use gd_world::prelude::*;
+use gd_world::provider::Stats as PStats;
+use gd_world::requestor::Stats as RStats;
 use rand::prelude::*;
 use rand_chacha::ChaChaRng;
 use rayon::prelude::*;
 use serde_derive::Deserialize;
-use gd_world::prelude::*;
-use gd_world::requestor::Stats as RStats;
-use gd_world::provider::Stats as PStats;
-use gd_world::logger as logger;
 
 mod params;
 
@@ -54,7 +54,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let file = File::open(Path::new(&args.arg_json))?;
     let params: SimulationParams = serde_json::from_reader(file)?;
 
-    let results: Vec<(Vec<RStats>, Vec<PStats>)> = (0..args.flag_repetitions)
+    let results: Result<Vec<(Vec<RStats>, Vec<PStats>)>, SimulationError> = (0..args
+        .flag_repetitions)
         .into_par_iter()
         .map(|run_num| {
             let mut rng = match params.seed {
@@ -103,10 +104,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             world.append_providers(providers);
 
             // run the simulation
-            world.run(params.duration);
+            world.run(params.duration)?;
 
             // gather statistics
-            world.into_stats(run_num as u64)
+            Ok(world.into_stats(run_num as u64))
         })
         .collect();
 
@@ -124,7 +125,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut requestors_wtr = Writer::from_path(create_path("requestors_stats", params.seed))?;
     let mut providers_wtr = Writer::from_path(create_path("providers_stats", params.seed))?;
 
-    for (requestors, providers) in results {
+    for (requestors, providers) in results? {
         for requestor in requestors {
             requestors_wtr.serialize(requestor)?;
         }

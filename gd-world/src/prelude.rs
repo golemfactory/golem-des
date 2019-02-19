@@ -5,3 +5,4 @@ pub use crate::provider::{
 pub use crate::requestor::Requestor;
 pub use crate::task::{SubTask, Task};
 pub use crate::world::World;
+pub use crate::error::SimulationError;
