@@ -45,7 +45,7 @@ where
     pub fn push_requestor(&mut self, requestor: Requestor) {
         debug!("W:adding {}", requestor);
 
-        self.requestors.insert(requestor.id(), requestor);
+        self.requestors.insert(*requestor.id(), requestor);
     }
 
     pub fn append_requestors<It>(&mut self, requestors: It)
@@ -60,7 +60,7 @@ where
     pub fn push_provider(&mut self, provider: Box<dyn Provider>) {
         debug!("W:adding {}", provider);
 
-        self.providers.insert(provider.id(), provider);
+        self.providers.insert(*provider.id(), provider);
     }
 
     pub fn append_providers<It>(&mut self, providers: It)
@@ -123,7 +123,7 @@ where
                 .get_mut(&provider_id)
                 .expect("W:provider not found!");
 
-            provider.receive_subtask(&mut self.engine, &mut self.rng, requestor_id, subtask, bid);
+            provider.receive_subtask(&mut self.engine, &mut self.rng, &subtask, &requestor_id, bid);
         }
     }
 
@@ -138,11 +138,11 @@ where
             .get_mut(&provider_id)
             .expect("W:provider not found");
 
-        provider.finish_computing(self.engine.now(), requestor_id, subtask);
+        provider.finish_computing(self.engine.now(), &subtask, &requestor_id);
         let reported_usage = provider.report_usage(&subtask, bid);
-        requestor.verify_subtask(provider_id, subtask, bid, reported_usage);
-        let payment = requestor.send_payment(provider_id, subtask, bid, reported_usage);
-        provider.receive_payment(requestor_id, subtask, payment);
+        requestor.verify_subtask(&subtask, &provider_id, bid, reported_usage);
+        let payment = requestor.send_payment(&subtask, &provider_id, bid, reported_usage);
+        provider.receive_payment(&subtask, &requestor_id, payment);
         requestor.complete_task();
 
         self.schedule_advertise();
@@ -159,8 +159,8 @@ where
             .get_mut(&provider_id)
             .expect("W:provider not found");
 
-        provider.cancel_computing(self.engine.now(), requestor_id, subtask);
-        requestor.budget_exceeded(provider_id, subtask);
+        provider.cancel_computing(self.engine.now(), &subtask, &requestor_id);
+        requestor.budget_exceeded(&subtask, &provider_id);
 
         self.schedule_advertise();
     }

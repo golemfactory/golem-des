@@ -71,8 +71,8 @@ impl SubTask {
         }
     }
 
-    pub fn id(&self) -> Id {
-        self.id
+    pub fn id(&self) -> &Id {
+        &self.id
     }
 }
 
