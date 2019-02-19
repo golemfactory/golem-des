@@ -56,15 +56,17 @@ where
             self.source.budget_factor.sample(self.rng),
             true,
         );
-        let task = Task::new(
-            self.source.subtask_count.sample(self.rng).round() as usize,
-            || {
-                let nominal_usage = self.source.nominal_usage.sample(self.rng);
-                let budget = requestor.max_price() * requestor.budget_factor() * nominal_usage;
 
-                SubTask::new(nominal_usage, budget)
-            },
-        );
+        let count = self.source.subtask_count.sample(self.rng).round() as usize;
+        let mut task = Task::new();
+
+        for _ in 0..count {
+            let nominal_usage = self.source.nominal_usage.sample(self.rng);
+            let budget = requestor.max_price() * requestor.budget_factor() * nominal_usage;
+
+            task.push_pending(SubTask::new(nominal_usage, budget));
+        }
+
         requestor.push_task(task);
 
         Some(requestor)

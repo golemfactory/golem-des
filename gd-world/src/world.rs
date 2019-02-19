@@ -213,7 +213,7 @@ where
 
         for (_, requestor) in &mut self.requestors {
             for (id, usage_factor) in &usage_factors {
-                requestor.receive_benchmark(id, *usage_factor);
+                requestor.receive_benchmark(id, *usage_factor)?;
             }
         }
 

@@ -15,19 +15,12 @@ pub struct RequestorSpec {
 }
 
 impl RequestorSpec {
-    pub fn into_requestor<'a, Rng>(
-        &self,
-        rng: &'a mut Rng,
-    ) -> Requestor
+    pub fn into_requestor<'a, Rng>(&self, rng: &'a mut Rng) -> Requestor
     where
         Rng: rand::Rng,
     {
-        let mut requestor = Requestor::with_id(
-            self.id,
-            self.max_price,
-            self.budget_factor,
-            self.repeating,
-        );
+        let mut requestor =
+            Requestor::with_id(self.id, self.max_price, self.budget_factor, self.repeating);
         requestor.append_tasks(
             self.tasks
                 .iter()
@@ -49,12 +42,16 @@ impl TaskSpec {
     where
         Rng: rand::Rng,
     {
-        Task::new(self.subtask_count, || {
+        let mut task = Task::new();
+
+        for _ in 0..self.subtask_count {
             let nominal_usage = self.nominal_usage.sample(rng);
             let budget = max_price * budget_factor * nominal_usage;
 
-            SubTask::new(nominal_usage, budget)
-        })
+            task.push_pending(SubTask::new(nominal_usage, budget));
+        }
+
+        task
     }
 }
 
