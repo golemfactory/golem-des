@@ -19,13 +19,13 @@ impl RequestorSpec {
     where
         Rng: rand::Rng,
     {
-        let mut requestor =
-            Requestor::with_id(self.id, self.max_price, self.budget_factor, self.repeating);
-        requestor.append_tasks(
+        let mut requestor = Requestor::with_id(self.id, self.max_price, self.budget_factor);
+        requestor.task_queue_mut().append(
             self.tasks
                 .iter()
                 .map(|t| t.into_task(rng, self.max_price, self.budget_factor)),
         );
+        requestor.task_queue_mut().repeating = self.repeating;
 
         requestor
     }

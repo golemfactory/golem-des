@@ -3,8 +3,9 @@ use std::fmt;
 
 use crate::id::Id;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Task {
+    id: Id,
     size: usize,
     pending: VecDeque<SubTask>,
     done: VecDeque<SubTask>,
@@ -13,6 +14,7 @@ pub struct Task {
 impl Task {
     pub fn new() -> Task {
         Task {
+            id: Id::new(),
             size: 0,
             pending: VecDeque::new(),
             done: VecDeque::new(),
@@ -45,11 +47,18 @@ impl std::fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Task({}, {}, {})",
+            "Task({}, {}, {}, {})",
+            self.id,
             self.size,
             self.pending.len(),
             self.done.len(),
         )
+    }
+}
+
+impl PartialEq for Task {
+    fn eq(&self, other: &Task) -> bool {
+        self.id == other.id
     }
 }
 
