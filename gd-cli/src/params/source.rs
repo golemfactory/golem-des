@@ -13,10 +13,7 @@ pub struct RequestorSource {
 }
 
 impl RequestorSource {
-    pub fn iter<'a, Rng>(
-        &'a self,
-        rng: &'a mut Rng,
-    ) -> RequestorSourceIter<Rng>
+    pub fn iter<'a, Rng>(&'a self, rng: &'a mut Rng) -> RequestorSourceIter<Rng>
     where
         Rng: rand::Rng,
     {
@@ -54,7 +51,6 @@ where
         let mut requestor = Requestor::new(
             self.source.max_price.sample(self.rng),
             self.source.budget_factor.sample(self.rng),
-            true,
         );
 
         let count = self.source.subtask_count.sample(self.rng).round() as usize;
@@ -67,7 +63,7 @@ where
             task.push_pending(SubTask::new(nominal_usage, budget));
         }
 
-        requestor.push_task(task);
+        requestor.task_queue_mut().push(task);
 
         Some(requestor)
     }
@@ -122,12 +118,14 @@ where
         let usage_factor = self.source.usage_factor.sample(self.rng);
 
         Some(match self.source.behaviour {
-            ProviderBehaviour::UndercutBudget(epsilon) => {
-                Box::new(UndercutBudgetProvider::new(min_price, usage_factor, epsilon))
-            }
-            ProviderBehaviour::LinearUsageInflation(factor) => {
-                Box::new(LinearUsageInflationProvider::new(min_price, usage_factor, factor))
-            }
+            ProviderBehaviour::UndercutBudget(epsilon) => Box::new(UndercutBudgetProvider::new(
+                min_price,
+                usage_factor,
+                epsilon,
+            )),
+            ProviderBehaviour::LinearUsageInflation(factor) => Box::new(
+                LinearUsageInflationProvider::new(min_price, usage_factor, factor),
+            ),
             _ => Box::new(RegularProvider::new(min_price, usage_factor)),
         })
     }

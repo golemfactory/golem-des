@@ -1,5 +1,9 @@
+mod task_queue;
+
+pub use self::task_queue::TaskQueue;
+
 use std::cmp::Ordering;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fmt;
 
 use gd_engine::Engine;
@@ -27,31 +31,6 @@ pub struct Stats {
     pub num_readvertisements: usize,
     pub num_subtasks_computed: usize,
     pub num_subtasks_cancelled: usize,
-}
-
-#[derive(Debug)]
-struct TaskQueue {
-    buffer: VecDeque<Task>,
-    repeating: bool,
-}
-
-impl TaskQueue {
-    fn new(repeating: bool) -> TaskQueue {
-        TaskQueue {
-            buffer: VecDeque::new(),
-            repeating: repeating,
-        }
-    }
-
-    fn pop(&mut self) -> Option<Task> {
-        self.buffer.pop_front().map(|task| {
-            if self.repeating {
-                self.buffer.push_back(task.clone());
-            }
-
-            task
-        })
-    }
 }
 
 #[allow(dead_code)]
@@ -107,17 +86,17 @@ impl Requestor {
     const MEAN_TASK_ARRIVAL_TIME: f64 = 3600.0;
     const READVERT_DELAY: f64 = 60.0;
 
-    pub fn new(max_price: f64, budget_factor: f64, repeating: bool) -> Requestor {
-        Requestor::with_id(Id::new(), max_price, budget_factor, repeating)
+    pub fn new(max_price: f64, budget_factor: f64) -> Requestor {
+        Requestor::with_id(Id::new(), max_price, budget_factor)
     }
 
-    pub fn with_id(id: Id, max_price: f64, budget_factor: f64, repeating: bool) -> Requestor {
+    pub fn with_id(id: Id, max_price: f64, budget_factor: f64) -> Requestor {
         Requestor {
             id: id,
             max_price: max_price,
             budget_factor: budget_factor,
             task: None,
-            task_queue: TaskQueue::new(repeating),
+            task_queue: TaskQueue::new(),
             ratings: HashMap::new(),
             blacklist: HashMap::new(),
             verification_map: HashMap::new(),
@@ -142,14 +121,12 @@ impl Requestor {
         self.budget_factor
     }
 
-    pub fn push_task(&mut self, task: Task) {
-        self.task_queue.buffer.push_back(task)
+    pub fn task_queue(&self) -> &TaskQueue {
+        &self.task_queue
     }
 
-    pub fn append_tasks<It: IntoIterator<Item = Task>>(&mut self, tasks: It) {
-        for task in tasks {
-            self.push_task(task);
-        }
+    pub fn task_queue_mut(&mut self) -> &mut TaskQueue {
+        &mut self.task_queue
     }
 
     pub fn advertise<Rng>(&mut self, engine: &mut Engine<Event>, rng: &mut Rng)
@@ -504,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_receive_benchmark() {
-        let mut requestor = Requestor::new(1.0, 1.0, false);
+        let mut requestor = Requestor::new(1.0, 1.0);
         let p1 = (Id::new(), 0.5);
         let p2 = (Id::new(), 0.75);
 
@@ -518,7 +495,7 @@ mod tests {
 
     #[test]
     fn test_rank_offers() {
-        let requestor = Requestor::new(1.0, 1.0, false);
+        let requestor = Requestor::new(1.0, 1.0);
         let bid1 = (Id::new(), 2.5, 0.25); // (provider_id, bid/offer, rating stored at the requestor)
         let bid2 = (Id::new(), 0.5, 0.75);
 
@@ -527,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_filter_offers() {
-        let mut requestor = Requestor::new(1.0, 1.0, false);
+        let mut requestor = Requestor::new(1.0, 1.0);
         let bid1 = (Id::new(), 1.0); // (provider_id, bid/offer)
         let bid2 = (Id::new(), 2.0);
 
@@ -544,11 +521,11 @@ mod tests {
 
     #[test]
     fn test_select_offers() {
-        let mut requestor = Requestor::new(1.0, 1.0, false);
+        let mut requestor = Requestor::new(1.0, 1.0);
         let subtask = SubTask::new(1.0, 1.0);
         let mut task = Task::new();
         task.push_pending(subtask);
-        requestor.push_task(task.clone());
+        requestor.task_queue.push(task.clone());
 
         assert_eq!(requestor.task, None);
 
