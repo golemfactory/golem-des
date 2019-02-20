@@ -261,3 +261,45 @@ impl fmt::Display for ProviderCommon {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use statrs::assert_almost_eq;
+
+    #[test]
+    fn test_send_offer() {
+        let mut provider = ProviderCommon::new(Id::new(), 1.0, 1.0);
+        provider.state = State::Idle;
+
+        assert_eq!(provider.send_offer(), Some(2.0));
+
+        provider.state = State::Busy;
+
+        assert_eq!(provider.send_offer(), None);
+    }
+
+    #[test]
+    fn test_increase_profit_margin() {
+        let mut provider = ProviderCommon::new(Id::new(), 1.0, 1.0);
+
+        assert_almost_eq!(provider.profit_margin, 1.0, 1e-5);
+
+        provider.increase_profit_margin(1000.0);
+
+        assert_almost_eq!(provider.profit_margin, 1.01005, 1e-5);
+    }
+
+    #[test]
+    fn test_decrease_profit_margin() {
+        let mut provider = ProviderCommon::new(Id::new(), 1.0, 1.0);
+
+        assert_almost_eq!(provider.profit_margin, 1.0, 1e-5);
+
+        provider.decrease_profit_margin(1000.0);
+
+        assert_almost_eq!(provider.profit_margin, 0.99004, 1e-5);
+
+    }
+}
