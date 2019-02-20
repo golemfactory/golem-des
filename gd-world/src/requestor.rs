@@ -3,12 +3,11 @@ mod task_queue;
 pub use self::task_queue::TaskQueue;
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use gd_engine::Engine;
 use log::debug;
-use num_traits::{NumAssign, NumCast};
 use rand::distributions::Exp;
 use rand::prelude::*;
 use serde_derive::{Deserialize, Serialize};
@@ -33,37 +32,6 @@ pub struct Stats {
     pub num_subtasks_cancelled: usize,
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
-enum BanDuration<T>
-where
-    T: fmt::Debug + NumAssign + NumCast,
-{
-    Until(T),
-    Indefinitely,
-}
-
-#[allow(dead_code)]
-impl<T> BanDuration<T>
-where
-    T: fmt::Debug + NumAssign + NumCast,
-{
-    fn is_expired(&self) -> bool {
-        match self {
-            BanDuration::Until(value) => {
-                *value == NumCast::from(0).expect("could not convert int to T")
-            }
-            BanDuration::Indefinitely => false,
-        }
-    }
-
-    fn decrement(&mut self) {
-        if let BanDuration::Until(ref mut value) = *self {
-            *value -= NumCast::from(1).expect("could not convert int to T")
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Requestor {
     id: Id,
@@ -72,7 +40,7 @@ pub struct Requestor {
     task: Option<Task>,
     task_queue: TaskQueue,
     ratings: HashMap<Id, f64>,
-    blacklist: HashMap<Id, BanDuration<i64>>,
+    blacklisted_set: HashSet<Id>,
     verification_map: HashMap<Id, Vec<Option<(Id, f64)>>>,
     mean_cost: (usize, f64),
     num_tasks_advertised: usize,
@@ -98,7 +66,7 @@ impl Requestor {
             task: None,
             task_queue: TaskQueue::new(),
             ratings: HashMap::new(),
-            blacklist: HashMap::new(),
+            blacklisted_set: HashSet::new(),
             verification_map: HashMap::new(),
             mean_cost: (0, 0.0),
             num_tasks_advertised: 0,
@@ -220,7 +188,7 @@ impl Requestor {
 
         let bids: Vec<(Id, f64)> = bids
             .into_iter()
-            .filter(|(id, _)| !self.blacklist.contains_key(&id))
+            .filter(|(id, _)| !self.blacklisted_set.contains(&id))
             .collect();
 
         debug!(
@@ -318,11 +286,9 @@ impl Requestor {
         );
 
         if *usage_factor >= 2.0 {
-            let duration = BanDuration::Indefinitely;
+            debug!("R{}:P{} blacklisted", self.id, id1);
 
-            debug!("R{}:P{} blacklisted for {:?}", self.id, id1, duration);
-
-            self.blacklist.insert(id1, duration);
+            self.blacklisted_set.insert(id1);
         }
 
         Ok(())
@@ -508,14 +474,12 @@ mod tests {
         let bid1 = (Id::new(), 1.0); // (provider_id, bid/offer)
         let bid2 = (Id::new(), 2.0);
 
-        assert!(requestor.blacklist.is_empty());
+        assert!(requestor.blacklisted_set.is_empty());
         assert_eq!(requestor.filter_offers(vec![bid1, bid2]), vec![bid1, bid2]);
 
-        requestor
-            .blacklist
-            .insert(bid1.0, BanDuration::Indefinitely);
+        requestor.blacklisted_set.insert(bid1.0);
 
-        assert!(!requestor.blacklist.is_empty());
+        assert!(!requestor.blacklisted_set.is_empty());
         assert_eq!(requestor.filter_offers(vec![bid1, bid2]), vec![bid2]);
     }
 
