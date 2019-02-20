@@ -98,3 +98,32 @@ impl PartialEq for SubTask {
         self.id == other.id
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_task_states() {
+        let mut task = Task::new();
+
+        assert!(!task.is_pending());
+        assert!(task.is_done());
+
+        let subtask = SubTask::new(1.0, 1.0);
+        task.push_pending(subtask);
+
+        assert!(task.is_pending());
+        assert!(!task.is_done());
+
+        task.pop_pending();
+
+        assert!(!task.is_pending());
+        assert!(!task.is_done());
+
+        task.push_done(subtask);
+
+        assert!(!task.is_pending());
+        assert!(task.is_done());
+    }
+}
