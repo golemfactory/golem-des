@@ -215,7 +215,7 @@ impl Requestor {
             .verification_map
             .insert_verification(subtask.id(), Some((*provider_id, reported_usage / rating)))
         {
-            if vers.len() == 2 {
+            if vers.len() == Self::REDUNDANCY_FACTOR {
                 if vers[0].1 > vers[1].1 {
                     self.update_rating(vers[0], vers[1]);
                 } else {
@@ -364,6 +364,8 @@ impl fmt::Display for Requestor {
 mod tests {
     use super::*;
 
+    use statrs::assert_almost_eq;
+
     #[test]
     fn test_rank_offers() {
         let mut requestor = Requestor::new(1.0, 1.0);
@@ -414,5 +416,32 @@ mod tests {
             requestor.select_offers(vec![bid1, bid2]),
             vec![(bid1.0, subtask, 1.0), (bid2.0, subtask, 2.0)]
         );
+    }
+
+    #[test]
+    fn test_update_rating() {
+        let mut requestor = Requestor::new(1.0, 1.0);
+        let p1 = (Id::new(), 0.25, 25.0); // (provider_id, rating, usage)
+        let p2 = (Id::new(), 0.75, 75.0);
+        requestor.ratings.insert(p1.0, p1.1);
+        requestor.ratings.insert(p2.0, p2.1);
+
+        requestor.update_rating((p1.0, p1.2 / p1.1), (p2.0, p2.2 / p2.1));
+
+        assert_almost_eq!(*requestor.ratings.get(&p1.0).unwrap(), 0.25, 1e-5);
+        assert_almost_eq!(*requestor.ratings.get(&p2.0).unwrap(), 0.75, 1e-5);
+        assert!(requestor.blacklisted_set.is_empty());
+
+        requestor.update_rating((p1.0, 200.0), (p2.0, p2.2 / p2.1));
+
+        assert_almost_eq!(*requestor.ratings.get(&p1.0).unwrap(), 0.5, 1e-5);
+        assert_almost_eq!(*requestor.ratings.get(&p2.0).unwrap(), 0.75, 1e-5);
+        assert!(requestor.blacklisted_set.is_empty());
+
+        requestor.update_rating((p1.0, 400.0), (p2.0, p2.2 / p2.1));
+
+        assert_almost_eq!(*requestor.ratings.get(&p1.0).unwrap(), 2.0, 1e-5);
+        assert_almost_eq!(*requestor.ratings.get(&p2.0).unwrap(), 0.75, 1e-5);
+        assert!(requestor.blacklisted_set.contains(&p1.0));
     }
 }
