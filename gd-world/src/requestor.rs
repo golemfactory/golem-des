@@ -204,30 +204,39 @@ impl Requestor {
         &mut self,
         subtask: &SubTask,
         provider_id: &Id,
-        _bid: f64,
-        reported_usage: f64,
+        reported_usage: Option<f64>,
     ) {
         debug!("R{}:verifying {}", self.id, subtask);
 
-        let rating = self.ratings.get(&provider_id).expect("rating not found");
-
+        let ver_res = reported_usage.map(|usage| {
+            let rating = self.ratings.get(&provider_id).expect("rating not found");
+            (*provider_id, usage / rating)
+        });
         if let Some(vers) = self
             .verification_map
-            .insert_verification(subtask.id(), Some((*provider_id, reported_usage / rating)))
+            .insert_verification(subtask.id(), ver_res)
         {
-            if vers.len() == Self::REDUNDANCY_FACTOR {
-                if vers[0].1 > vers[1].1 {
-                    self.update_rating(vers[0], vers[1]);
-                } else {
-                    self.update_rating(vers[1], vers[0]);
+            if vers.len() > 0 {
+                if vers.len() == Self::REDUNDANCY_FACTOR {
+                    if vers[0].1 > vers[1].1 {
+                        self.update_rating(vers[0], vers[1]);
+                    } else {
+                        self.update_rating(vers[1], vers[0]);
+                    }
                 }
-            }
 
-            self.num_subtasks_computed += 1;
-            self.task
-                .as_mut()
-                .expect("task not found")
-                .push_done(*subtask);
+                self.num_subtasks_computed += 1;
+                self.task
+                    .as_mut()
+                    .expect("task not found")
+                    .push_done(*subtask);
+            } else {
+                self.num_subtasks_cancelled += 1;
+                self.task
+                    .as_mut()
+                    .expect("task not found")
+                    .push_pending(*subtask);
+            }
         }
     }
 
@@ -288,32 +297,6 @@ impl Requestor {
 
             self.num_tasks_computed += 1;
             self.task = None;
-        }
-    }
-
-    pub fn budget_exceeded(&mut self, subtask: &SubTask, provider_id: &Id) {
-        debug!(
-            "R{}:budget exceeded for {} by P{}",
-            self.id, subtask, provider_id
-        );
-
-        if let Some(vers) = self
-            .verification_map
-            .insert_verification(subtask.id(), None)
-        {
-            if vers.len() > 0 {
-                self.num_subtasks_computed += 1;
-                self.task
-                    .as_mut()
-                    .expect("task not found")
-                    .push_done(*subtask);
-            } else {
-                self.num_subtasks_cancelled += 1;
-                self.task
-                    .as_mut()
-                    .expect("task not found")
-                    .push_pending(*subtask);
-            }
         }
     }
 
@@ -443,5 +426,99 @@ mod tests {
         assert_almost_eq!(*requestor.ratings.get(&p1.0).unwrap(), 2.0, 1e-5);
         assert_almost_eq!(*requestor.ratings.get(&p2.0).unwrap(), 0.75, 1e-5);
         assert!(requestor.blacklisted_set.contains(&p1.0));
+    }
+
+    #[test]
+    fn test_send_payment() {
+        let mut requestor = Requestor::new(1.0, 1.0);
+        let p1 = (SubTask::new(100.0, 100.0), Id::new(), 0.1, 50.0); // (subtask, provider_id, bid, usage)
+
+        assert_eq!(requestor.send_payment(&p1.0, &p1.1, p1.2, p1.3), Some(5.0));
+
+        assert_eq!(requestor.mean_cost.0, 1);
+        assert_almost_eq!(requestor.mean_cost.1, 0.05, 1e-5);
+    }
+
+    #[test]
+    fn test_complete_task() {
+        let mut requestor = Requestor::new(1.0, 1.0);
+        let task = Task::new();
+        requestor.task_queue.push(task.clone());
+        requestor.task = requestor.task_queue.pop();
+
+        assert_eq!(requestor.task, Some(task));
+        assert!(requestor.task.as_ref().unwrap().is_done());
+
+        requestor.complete_task();
+
+        assert_eq!(requestor.task, None);
+    }
+
+    #[test]
+    fn test_all_verification_paths() {
+        let setup = || {
+            let mut requestor = Requestor::new(1.0, 1.0);
+            let mut task = Task::new();
+            task.push_pending(SubTask::new(100.0, 100.0));
+            requestor.task_queue.push(task);
+            requestor.task = requestor.task_queue.pop();
+
+            let p1 = (Id::new(), 0.25, 100.0);
+            let p2 = (Id::new(), 0.75, 75.0);
+            requestor.ratings.insert(p1.0, p1.1);
+            requestor.ratings.insert(p2.0, p2.1);
+
+            let subtask = requestor.task.as_mut().unwrap().pop_pending().unwrap();
+            requestor.verification_map.insert_key(*subtask.id());
+
+            assert!(!requestor.task.as_ref().unwrap().is_pending());
+            assert!(!requestor.task.as_ref().unwrap().is_done());
+
+            (requestor, subtask, p1, p2)
+        };
+
+        // 1. (success, success)
+        {
+            let (mut requestor, subtask, p1, p2) = setup();
+
+            requestor.verify_subtask(&subtask, &p1.0, Some(p1.2));
+            requestor.verify_subtask(&subtask, &p2.0, Some(p2.2));
+
+            assert!(!requestor.task.as_ref().unwrap().is_pending());
+            assert!(requestor.task.as_ref().unwrap().is_done());
+        }
+
+        // 2. (success, budget_exceeded)
+        {
+            let (mut requestor, subtask, p1, p2) = setup();
+
+            requestor.verify_subtask(&subtask, &p1.0, Some(p1.2));
+            requestor.verify_subtask(&subtask, &p2.0, None);
+
+            assert!(!requestor.task.as_ref().unwrap().is_pending());
+            assert!(requestor.task.as_ref().unwrap().is_done());
+        }
+
+        // 3. (budget_exceeded, success)
+        {
+            let (mut requestor, subtask, p1, p2) = setup();
+
+            requestor.verify_subtask(&subtask, &p1.0, None);
+            requestor.verify_subtask(&subtask, &p2.0, Some(p2.2));
+
+            assert!(!requestor.task.as_ref().unwrap().is_pending());
+            assert!(requestor.task.as_ref().unwrap().is_done());
+        }
+        
+        // 4. (budget_exceeded, budget_exceeded)
+        {
+            let (mut requestor, subtask, p1, p2) = setup();
+
+            requestor.verify_subtask(&subtask, &p1.0, None);
+            requestor.verify_subtask(&subtask, &p2.0, None);
+
+            assert!(requestor.task.as_ref().unwrap().is_pending());
+            assert!(!requestor.task.as_ref().unwrap().is_done());
+        }
     }
 }

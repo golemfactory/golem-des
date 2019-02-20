@@ -146,7 +146,7 @@ where
 
         provider.finish_computing(self.engine.now(), &subtask, &requestor_id);
         let reported_usage = provider.report_usage(&subtask, bid);
-        requestor.verify_subtask(&subtask, &provider_id, bid, reported_usage);
+        requestor.verify_subtask(&subtask, &provider_id, Some(reported_usage));
         let payment = requestor.send_payment(&subtask, &provider_id, bid, reported_usage);
         provider.receive_payment(&subtask, &requestor_id, payment);
         requestor.complete_task();
@@ -166,7 +166,7 @@ where
             .expect("provider not found");
 
         provider.cancel_computing(self.engine.now(), &subtask, &requestor_id);
-        requestor.budget_exceeded(&subtask, &provider_id);
+        requestor.verify_subtask(&subtask, &provider_id, None);
 
         self.schedule_advertise();
     }
