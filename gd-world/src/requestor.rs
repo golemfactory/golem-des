@@ -1,18 +1,19 @@
 mod task_queue;
+// mod verification;
 
 pub use self::task_queue::TaskQueue;
+// pub use self::verification::VerificationMap;
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use gd_engine::Engine;
-use log::debug;
+use log::{debug, warn};
 use rand::distributions::Exp;
 use rand::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::error::SimulationError;
 use crate::id::Id;
 use crate::task::{SubTask, Task};
 use crate::world::Event;
@@ -118,47 +119,26 @@ impl Requestor {
         }
     }
 
-    pub fn receive_benchmark(
-        &mut self,
-        provider_id: &Id,
-        reported_usage: f64,
-    ) -> Result<(), SimulationError> {
-        match self.ratings.insert(*provider_id, reported_usage) {
-            Some(_) => Err(SimulationError::RatingAlreadyExists(self.id, *provider_id)),
-            None => Ok(()),
+    pub fn receive_benchmark(&mut self, provider_id: &Id, reported_usage: f64) {
+        if let Some(old_rating) = self.ratings.insert(*provider_id, reported_usage) {
+            warn!(
+                "R{}:rating for P{} already existed, replacing: {} => {}",
+                self.id, provider_id, old_rating, reported_usage
+            )
         }
     }
 
-    pub fn select_offers(
-        &mut self,
-        bids: Vec<(Id, f64)>,
-    ) -> Result<Vec<(Id, SubTask, f64)>, SimulationError> {
+    pub fn select_offers(&mut self, bids: Vec<(Id, f64)>) -> Vec<(Id, SubTask, f64)> {
         // filter offers
         let bids = self.filter_offers(bids);
         // rank offers by effective price
-        let bids: Result<Vec<(Id, f64, f64)>, SimulationError> = bids
-            .into_iter()
-            .map(|(id, bid)| {
-                let rating = self
-                    .ratings
-                    .get(&id)
-                    .ok_or(SimulationError::RatingNotFound(self.id, id))?;
-                Ok((id, bid, *rating))
-            })
-            .collect();
-        let bids = self.rank_offers(bids?);
-
+        let bids = self.rank_offers(bids);
         // send available subtasks to eligible providers
         let mut messages: Vec<(Id, SubTask, f64)> = Vec::new();
         for chunk in bids.chunks_exact(REDUNDANCY_FACTOR) {
-            match self
-                .task
-                .as_mut()
-                .ok_or(SimulationError::TaskNotFound(self.id))?
-                .pop_pending()
-            {
+            match self.task.as_mut().expect("task not found").pop_pending() {
                 Some(subtask) => {
-                    for &(provider_id, bid, _) in chunk {
+                    for &(provider_id, bid) in chunk {
                         debug!(
                             "R{}:sending {} to P{} for {}",
                             self.id, subtask, provider_id, bid
@@ -174,7 +154,7 @@ impl Requestor {
             }
         }
 
-        Ok(messages)
+        messages
     }
 
     fn filter_offers(&mut self, bids: Vec<(Id, f64)>) -> Vec<(Id, f64)> {
@@ -202,8 +182,11 @@ impl Requestor {
         bids
     }
 
-    fn rank_offers(&self, mut bids: Vec<(Id, f64, f64)>) -> Vec<(Id, f64, f64)> {
-        bids.sort_unstable_by(|(_, x_bid, x_rating), (_, y_bid, y_rating)| {
+    fn rank_offers(&self, mut bids: Vec<(Id, f64)>) -> Vec<(Id, f64)> {
+        bids.sort_unstable_by(|(x_id, x_bid), (y_id, y_bid)| {
+            let x_rating = self.ratings.get(&x_id).expect("rating not found");
+            let y_rating = self.ratings.get(&y_id).expect("rating not found");
+
             let x_price = x_bid * x_rating;
             let y_price = y_bid * y_rating;
 
@@ -225,58 +208,46 @@ impl Requestor {
         provider_id: &Id,
         _bid: f64,
         reported_usage: f64,
-    ) -> Result<(), SimulationError> {
+    ) {
         debug!("R{}:verifying {}", self.id, subtask);
 
-        let rating = self
-            .ratings
-            .get(&provider_id)
-            .ok_or(SimulationError::RatingNotFound(self.id, *provider_id))?;
+        let rating = self.ratings.get(&provider_id).expect("rating not found");
         self.verification_map
             .get_mut(subtask.id())
-            .ok_or(SimulationError::VerificationForSubtaskNotFound(
-                self.id, *subtask,
-            ))?
+            .expect("verification key not found")
             .push(Some((*provider_id, reported_usage / rating)));
 
         if self.verification_map.get(subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
-            return Ok(());
+            return;
         }
 
         let vers: Vec<(Id, f64)> = self
             .verification_map
             .remove(subtask.id())
-            .ok_or(SimulationError::VerificationForSubtaskNotFound(
-                self.id, *subtask,
-            ))?
+            .expect("verification key not found")
             .into_iter()
             .filter_map(|v| v)
             .collect();
 
         if vers.len() == 2 {
             if vers[0].1 > vers[1].1 {
-                self.update_rating(vers[0], vers[1])?;
+                self.update_rating(vers[0], vers[1]);
             } else {
-                self.update_rating(vers[1], vers[0])?;
+                self.update_rating(vers[1], vers[0]);
             }
         }
 
         self.num_subtasks_computed += 1;
         self.task
             .as_mut()
-            .ok_or(SimulationError::TaskNotFound(self.id))?
+            .expect("task not found")
             .push_done(*subtask);
-
-        Ok(())
     }
 
-    fn update_rating(&mut self, p1: (Id, f64), p2: (Id, f64)) -> Result<(), SimulationError> {
+    fn update_rating(&mut self, p1: (Id, f64), p2: (Id, f64)) {
         let (id1, d1) = p1;
         let (_, d2) = p2;
-        let usage_factor = self
-            .ratings
-            .get_mut(&id1)
-            .ok_or(SimulationError::RatingNotFound(self.id, id1))?;
+        let usage_factor = self.ratings.get_mut(&id1).expect("rating not found");
         let old_rating = *usage_factor;
         *usage_factor *= d1 / d2;
 
@@ -290,8 +261,6 @@ impl Requestor {
 
             self.blacklisted_set.insert(id1);
         }
-
-        Ok(())
     }
 
     pub fn send_payment(
@@ -326,27 +295,16 @@ impl Requestor {
         Some(payment)
     }
 
-    pub fn complete_task(&mut self) -> Result<(), SimulationError> {
-        if self
-            .task
-            .as_ref()
-            .ok_or(SimulationError::TaskNotFound(self.id))?
-            .is_done()
-        {
+    pub fn complete_task(&mut self) {
+        if self.task.as_ref().expect("task not found").is_done() {
             debug!("R{}:task computed", self.id);
 
             self.num_tasks_computed += 1;
             self.task = None;
         }
-
-        Ok(())
     }
 
-    pub fn budget_exceeded(
-        &mut self,
-        subtask: &SubTask,
-        provider_id: &Id,
-    ) -> Result<(), SimulationError> {
+    pub fn budget_exceeded(&mut self, subtask: &SubTask, provider_id: &Id) {
         debug!(
             "R{}:budget exceeded for {} by P{}",
             self.id, subtask, provider_id
@@ -354,29 +312,23 @@ impl Requestor {
 
         self.verification_map
             .get_mut(subtask.id())
-            .ok_or(SimulationError::VerificationForSubtaskNotFound(
-                self.id, *subtask,
-            ))?
+            .expect("verification key not found")
             .push(None);
 
         if self
             .verification_map
             .get(subtask.id())
-            .ok_or(SimulationError::VerificationForSubtaskNotFound(
-                self.id, *subtask,
-            ))?
+            .expect("verification key not found")
             .len()
             < REDUNDANCY_FACTOR
         {
-            return Ok(());
+            return;
         }
 
         let vers: Vec<(Id, f64)> = self
             .verification_map
             .remove(subtask.id())
-            .ok_or(SimulationError::VerificationForSubtaskNotFound(
-                self.id, *subtask,
-            ))?
+            .expect("verification key not found")
             .into_iter()
             .filter_map(|v| v)
             .collect();
@@ -385,17 +337,15 @@ impl Requestor {
             self.num_subtasks_computed += 1;
             self.task
                 .as_mut()
-                .ok_or(SimulationError::TaskNotFound(self.id))?
+                .expect("task not found")
                 .push_done(*subtask);
         } else {
             self.num_subtasks_cancelled += 1;
             self.task
                 .as_mut()
-                .ok_or(SimulationError::TaskNotFound(self.id))?
+                .expect("task not found")
                 .push_pending(*subtask);
         }
-
-        Ok(())
     }
 
     pub fn into_stats(self, run_id: u64) -> Stats {
@@ -446,24 +396,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_receive_benchmark() {
-        let mut requestor = Requestor::new(1.0, 1.0);
-        let p1 = (Id::new(), 0.5);
-        let p2 = (Id::new(), 0.75);
-
-        assert_eq!(requestor.receive_benchmark(&p1.0, p1.1).ok(), Some(()));
-        assert_eq!(requestor.receive_benchmark(&p2.0, p2.1).ok(), Some(()));
-        assert_eq!(
-            requestor.receive_benchmark(&p1.0, p1.1).err(),
-            Some(SimulationError::RatingAlreadyExists(requestor.id, p1.0))
-        );
-    }
-
-    #[test]
     fn test_rank_offers() {
-        let requestor = Requestor::new(1.0, 1.0);
-        let bid1 = (Id::new(), 2.5, 0.25); // (provider_id, bid/offer, rating stored at the requestor)
-        let bid2 = (Id::new(), 0.5, 0.75);
+        let mut requestor = Requestor::new(1.0, 1.0);
+        let bid1 = (Id::new(), 2.5); // (provider_id, bid/offer)
+        let bid2 = (Id::new(), 0.5);
+        requestor.ratings.insert(bid1.0, 0.25);
+        requestor.ratings.insert(bid2.0, 0.75);
 
         assert_eq!(requestor.rank_offers(vec![bid1, bid2]), vec![bid2, bid1]);
     }
@@ -503,10 +441,8 @@ mod tests {
         requestor.ratings.insert(bid1.0, 1.0);
         requestor.ratings.insert(bid2.0, 1.0);
 
-        let messages = requestor.select_offers(vec![bid1, bid2]).unwrap();
-
         assert_eq!(
-            messages,
+            requestor.select_offers(vec![bid1, bid2]),
             vec![(bid1.0, subtask, 1.0), (bid2.0, subtask, 2.0)]
         );
     }

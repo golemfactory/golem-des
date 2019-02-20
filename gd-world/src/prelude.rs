@@ -1,4 +1,3 @@
-pub use crate::error::SimulationError;
 pub use crate::id::Id;
 pub use crate::provider::{
     LinearUsageInflationProvider, Provider, RegularProvider, UndercutBudgetProvider,
