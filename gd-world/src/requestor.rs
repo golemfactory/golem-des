@@ -1,8 +1,8 @@
 mod task_queue;
-// mod verification;
+mod verification;
 
 pub use self::task_queue::TaskQueue;
-// pub use self::verification::VerificationMap;
+pub use self::verification::VerificationMap;
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -17,8 +17,6 @@ use serde_derive::{Deserialize, Serialize};
 use crate::id::Id;
 use crate::task::{SubTask, Task};
 use crate::world::Event;
-
-const REDUNDANCY_FACTOR: usize = 2;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Stats {
@@ -42,7 +40,7 @@ pub struct Requestor {
     task_queue: TaskQueue,
     ratings: HashMap<Id, f64>,
     blacklisted_set: HashSet<Id>,
-    verification_map: HashMap<Id, Vec<Option<(Id, f64)>>>,
+    verification_map: VerificationMap<Id>,
     mean_cost: (usize, f64),
     num_tasks_advertised: usize,
     num_tasks_computed: usize,
@@ -52,6 +50,7 @@ pub struct Requestor {
 }
 
 impl Requestor {
+    const REDUNDANCY_FACTOR: usize = 2;
     const MEAN_TASK_ARRIVAL_TIME: f64 = 3600.0;
     const READVERT_DELAY: f64 = 60.0;
 
@@ -68,7 +67,7 @@ impl Requestor {
             task_queue: TaskQueue::new(),
             ratings: HashMap::new(),
             blacklisted_set: HashSet::new(),
-            verification_map: HashMap::new(),
+            verification_map: VerificationMap::new(Self::REDUNDANCY_FACTOR),
             mean_cost: (0, 0.0),
             num_tasks_advertised: 0,
             num_tasks_computed: 0,
@@ -135,7 +134,7 @@ impl Requestor {
         let bids = self.rank_offers(bids);
         // send available subtasks to eligible providers
         let mut messages: Vec<(Id, SubTask, f64)> = Vec::new();
-        for chunk in bids.chunks_exact(REDUNDANCY_FACTOR) {
+        for chunk in bids.chunks_exact(Self::REDUNDANCY_FACTOR) {
             match self.task.as_mut().expect("task not found").pop_pending() {
                 Some(subtask) => {
                     for &(provider_id, bid) in chunk {
@@ -147,8 +146,7 @@ impl Requestor {
                         messages.push((provider_id, subtask, bid));
                     }
 
-                    self.verification_map
-                        .insert(*subtask.id(), Vec::with_capacity(REDUNDANCY_FACTOR));
+                    self.verification_map.insert_key(*subtask.id());
                 }
                 None => break,
             }
@@ -212,36 +210,25 @@ impl Requestor {
         debug!("R{}:verifying {}", self.id, subtask);
 
         let rating = self.ratings.get(&provider_id).expect("rating not found");
-        self.verification_map
-            .get_mut(subtask.id())
-            .expect("verification key not found")
-            .push(Some((*provider_id, reported_usage / rating)));
 
-        if self.verification_map.get(subtask.id()).unwrap().len() < REDUNDANCY_FACTOR {
-            return;
-        }
-
-        let vers: Vec<(Id, f64)> = self
+        if let Some(vers) = self
             .verification_map
-            .remove(subtask.id())
-            .expect("verification key not found")
-            .into_iter()
-            .filter_map(|v| v)
-            .collect();
-
-        if vers.len() == 2 {
-            if vers[0].1 > vers[1].1 {
-                self.update_rating(vers[0], vers[1]);
-            } else {
-                self.update_rating(vers[1], vers[0]);
+            .insert_verification(subtask.id(), Some((*provider_id, reported_usage / rating)))
+        {
+            if vers.len() == 2 {
+                if vers[0].1 > vers[1].1 {
+                    self.update_rating(vers[0], vers[1]);
+                } else {
+                    self.update_rating(vers[1], vers[0]);
+                }
             }
-        }
 
-        self.num_subtasks_computed += 1;
-        self.task
-            .as_mut()
-            .expect("task not found")
-            .push_done(*subtask);
+            self.num_subtasks_computed += 1;
+            self.task
+                .as_mut()
+                .expect("task not found")
+                .push_done(*subtask);
+        }
     }
 
     fn update_rating(&mut self, p1: (Id, f64), p2: (Id, f64)) {
@@ -310,41 +297,23 @@ impl Requestor {
             self.id, subtask, provider_id
         );
 
-        self.verification_map
-            .get_mut(subtask.id())
-            .expect("verification key not found")
-            .push(None);
-
-        if self
+        if let Some(vers) = self
             .verification_map
-            .get(subtask.id())
-            .expect("verification key not found")
-            .len()
-            < REDUNDANCY_FACTOR
+            .insert_verification(subtask.id(), None)
         {
-            return;
-        }
-
-        let vers: Vec<(Id, f64)> = self
-            .verification_map
-            .remove(subtask.id())
-            .expect("verification key not found")
-            .into_iter()
-            .filter_map(|v| v)
-            .collect();
-
-        if vers.len() > 0 {
-            self.num_subtasks_computed += 1;
-            self.task
-                .as_mut()
-                .expect("task not found")
-                .push_done(*subtask);
-        } else {
-            self.num_subtasks_cancelled += 1;
-            self.task
-                .as_mut()
-                .expect("task not found")
-                .push_pending(*subtask);
+            if vers.len() > 0 {
+                self.num_subtasks_computed += 1;
+                self.task
+                    .as_mut()
+                    .expect("task not found")
+                    .push_done(*subtask);
+            } else {
+                self.num_subtasks_cancelled += 1;
+                self.task
+                    .as_mut()
+                    .expect("task not found")
+                    .push_pending(*subtask);
+            }
         }
     }
 
