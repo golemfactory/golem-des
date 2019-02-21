@@ -69,22 +69,15 @@ impl Redundancy {
         let requestor_id = self.requestor_id;
         let (id1, d1) = p1;
         let (_, d2) = p2;
-
-        let usage_factor = self.ratings.get_mut(&id1).expect("rating not found");
-
-        let old_rating = *usage_factor;
-        *usage_factor *= d1 / d2;
+        let old_rating = self.get_provider_rating(&id1);
+        let new_rating = old_rating * d1 / d2;
 
         debug!(
             "R{}:P{} failed verification, rating {} => {}",
-            requestor_id, id1, old_rating, *usage_factor
+            requestor_id, id1, old_rating, new_rating
         );
 
-        if *usage_factor >= 2.0 {
-            debug!("R{}:P{} blacklisted", requestor_id, id1);
-
-            self.blacklisted_set.insert(id1);
-        }
+        self.update_provider_rating(&id1, new_rating);
     }
 }
 
@@ -150,6 +143,8 @@ impl DefenceMechanism for Redundancy {
             subtask::Status::Pending
         }
     }
+
+    fn complete_task(&mut self) {}
 
     fn as_dm_common(&self) -> &DefenceMechanismCommon {
         &self.common

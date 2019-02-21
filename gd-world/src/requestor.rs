@@ -1,7 +1,7 @@
 mod defence;
 mod task_queue;
 
-pub use self::defence::{DefenceMechanism, Redundancy};
+pub use self::defence::{DefenceMechanism, DefenceMechanismType, Redundancy};
 pub use self::task_queue::TaskQueue;
 
 use std::fmt;
@@ -50,18 +50,23 @@ impl Requestor {
     const MEAN_TASK_ARRIVAL_TIME: f64 = 3600.0;
     const READVERT_DELAY: f64 = 60.0;
 
-    pub fn new(max_price: f64, budget_factor: f64) -> Requestor {
-        Requestor::with_id(Id::new(), max_price, budget_factor)
+    pub fn new(max_price: f64, budget_factor: f64, dm_type: DefenceMechanismType) -> Requestor {
+        Requestor::with_id(Id::new(), max_price, budget_factor, dm_type)
     }
 
-    pub fn with_id(id: Id, max_price: f64, budget_factor: f64) -> Requestor {
+    pub fn with_id(
+        id: Id,
+        max_price: f64,
+        budget_factor: f64,
+        dm_type: DefenceMechanismType,
+    ) -> Requestor {
         Requestor {
             id: id,
             max_price: max_price,
             budget_factor: budget_factor,
             task: None,
             task_queue: TaskQueue::new(),
-            defence_mechanism: Box::new(Redundancy::new(id)),
+            defence_mechanism: dm_type.into_dm(id),
             mean_cost: (0, 0.0),
             num_tasks_advertised: 0,
             num_tasks_computed: 0,
@@ -190,6 +195,7 @@ impl Requestor {
         if self.task.as_ref().expect("task not found").is_done() {
             debug!("R{}:task computed", self.id);
 
+            self.defence_mechanism.complete_task();
             self.num_tasks_computed += 1;
             self.task = None;
         }
@@ -246,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_send_payment() {
-        let mut requestor = Requestor::new(1.0, 1.0);
+        let mut requestor = Requestor::new(1.0, 1.0, DefenceMechanismType::Redundancy);
         let p1 = (SubTask::new(100.0, 100.0), Id::new(), 0.1, 50.0); // (subtask, provider_id, bid, usage)
 
         assert_eq!(requestor.send_payment(&p1.0, &p1.1, p1.2, p1.3), Some(5.0));
@@ -257,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_complete_task() {
-        let mut requestor = Requestor::new(1.0, 1.0);
+        let mut requestor = Requestor::new(1.0, 1.0, DefenceMechanismType::Redundancy);
         let task = Task::new();
         requestor.task_queue.push(task.clone());
         requestor.task = requestor.task_queue.pop();

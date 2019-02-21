@@ -7,6 +7,7 @@ use docopt::Docopt;
 use gd_world::logger;
 use gd_world::prelude::*;
 use gd_world::provider::Stats as PStats;
+use gd_world::requestor::DefenceMechanismType;
 use gd_world::requestor::Stats as RStats;
 use rand::prelude::*;
 use rand_chacha::ChaChaRng;
@@ -21,13 +22,14 @@ const USAGE: &'static str = "
 Golem marketplace agent-based DES simulator
 
 Usage:
-    golem_des <json> [--repetitions=<repetitions>] [--output-dir=<output-dir>] [--verbose]
+    golem_des <json> [--defence=<defence>] [--repetitions=<repetitions>] [--output-dir=<output-dir>] [--verbose]
     golem_des (-h | --help)
 
 Options:
     json                            JSON file with simulation parameters.
     -v --verbose                    Show debug logs.
     -h --help                       Show this screen.
+    --defence=<defence>             Defence mechanism (ctasks or redundancy) [default: redundancy].
     --repetitions=<repetitions>     Number of repetitions [default: 100].
     --output-dir=<output-dir>       Output directory for statistics.
 ";
@@ -35,6 +37,7 @@ Options:
 #[derive(Debug, Deserialize)]
 struct Args {
     arg_json: String,
+    flag_defence: DefenceMechanismType,
     flag_repetitions: usize,
     flag_verbose: bool,
     flag_output_dir: Option<String>,
@@ -54,8 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let file = File::open(Path::new(&args.arg_json))?;
     let params: SimulationParams = serde_json::from_reader(file)?;
 
-    let results: Vec<(Vec<RStats>, Vec<PStats>)> = (0..args
-        .flag_repetitions)
+    let results: Vec<(Vec<RStats>, Vec<PStats>)> = (0..args.flag_repetitions)
         .into_par_iter()
         .map(|run_num| {
             let mut rng = match params.seed {
@@ -69,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // create pre-specified actors
             if let Some(rs) = &params.requestors {
                 for spec in rs {
-                    requestors.push(spec.into_requestor(&mut rng));
+                    requestors.push(spec.into_requestor(&mut rng, args.flag_defence));
                 }
             }
 
@@ -82,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // create random actors
             if let Some(sources) = &params.requestor_sources {
                 for source in sources {
-                    for requestor in source.iter(&mut rng) {
+                    for requestor in source.iter(&mut rng, args.flag_defence) {
                         requestors.push(requestor);
                     }
                 }
