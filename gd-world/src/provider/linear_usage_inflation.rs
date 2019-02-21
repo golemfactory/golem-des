@@ -1,10 +1,12 @@
 use std::fmt;
 
+use gd_world_derive::DerefProviderCommon;
+
 use super::*;
 use crate::id::Id;
 use crate::task::SubTask;
 
-#[derive(Debug)]
+#[derive(Debug, DerefProviderCommon)]
 pub struct LinearUsageInflationProvider {
     inflation_factor: f64,
     common: ProviderCommon,
@@ -47,8 +49,8 @@ impl fmt::Display for LinearUsageInflationProvider {
 
 impl Provider for LinearUsageInflationProvider {
     fn report_usage(&self, subtask: &SubTask, bid: f64) -> f64 {
-        let intercept = self.common.usage_factor() * subtask.nominal_usage;
-        let usage = self.common.num_subtasks_computed as f64 * self.inflation_factor + intercept;
+        let intercept = self.usage_factor() * subtask.nominal_usage;
+        let usage = self.num_subtasks_computed as f64 * self.inflation_factor + intercept;
 
         usage.min(subtask.budget / bid)
     }
@@ -57,14 +59,14 @@ impl Provider for LinearUsageInflationProvider {
         Stats {
             run_id: run_id,
             behaviour: Behaviour::LinearUsageInflation,
-            min_price: self.common.min_price,
-            usage_factor: self.common.usage_factor,
-            profit_margin: self.common.profit_margin,
-            price: self.common.price(),
-            revenue: self.common.revenue,
-            num_subtasks_assigned: self.common.num_subtasks_assigned,
-            num_subtasks_computed: self.common.num_subtasks_computed,
-            num_subtasks_cancelled: self.common.num_subtasks_cancelled,
+            min_price: self.min_price,
+            usage_factor: self.usage_factor,
+            profit_margin: self.profit_margin,
+            price: self.price(),
+            revenue: self.revenue,
+            num_subtasks_assigned: self.num_subtasks_assigned,
+            num_subtasks_computed: self.num_subtasks_computed,
+            num_subtasks_cancelled: self.num_subtasks_cancelled,
         }
     }
 
@@ -95,16 +97,16 @@ mod tests {
         let subtask = SubTask::new(100.0, 100.0);
         assert_almost_eq!(50.0, provider.report_usage(&subtask, 1.0), 1e-3);
 
-        provider.as_provider_common_mut().num_subtasks_computed = 1;
+        provider.num_subtasks_computed = 1;
         assert_almost_eq!(51.0, provider.report_usage(&subtask, 1.0), 1e-3);
 
-        provider.as_provider_common_mut().num_subtasks_computed = 50;
+        provider.num_subtasks_computed = 50;
         assert_almost_eq!(100.0, provider.report_usage(&subtask, 1.0), 1e-3);
 
-        provider.as_provider_common_mut().num_subtasks_computed = 51;
+        provider.num_subtasks_computed = 51;
         assert_almost_eq!(100.0, provider.report_usage(&subtask, 1.0), 1e-3);
 
-        provider.as_provider_common_mut().num_subtasks_computed = 100;
+        provider.num_subtasks_computed = 100;
         assert_almost_eq!(100.0, provider.report_usage(&subtask, 1.0), 1e-3);
     }
 }

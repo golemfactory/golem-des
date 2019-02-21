@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 gd-engine = { path = "../gd-engine/" }
+gd-world-derive = { path = "../gd-world-derive/" }
 rand = "0.6"
 docopt = "1"
 serde = "1.0"

@@ -1,9 +1,11 @@
 use std::fmt;
 
+use gd_world_derive::DerefProviderCommon;
+
 use super::*;
 use crate::task::SubTask;
 
-#[derive(Debug)]
+#[derive(Debug, DerefProviderCommon)]
 pub struct UndercutBudgetProvider {
     epsilon: f64,
     common: ProviderCommon,
@@ -49,14 +51,14 @@ impl Provider for UndercutBudgetProvider {
         Stats {
             run_id: run_id,
             behaviour: Behaviour::UndercutBudget,
-            min_price: self.common.min_price,
-            usage_factor: self.common.usage_factor,
-            profit_margin: self.common.profit_margin,
-            price: self.common.price(),
-            revenue: self.common.revenue,
-            num_subtasks_assigned: self.common.num_subtasks_assigned,
-            num_subtasks_computed: self.common.num_subtasks_computed,
-            num_subtasks_cancelled: self.common.num_subtasks_cancelled,
+            min_price: self.min_price,
+            usage_factor: self.usage_factor,
+            profit_margin: self.profit_margin,
+            price: self.price(),
+            revenue: self.revenue,
+            num_subtasks_assigned: self.num_subtasks_assigned,
+            num_subtasks_computed: self.num_subtasks_computed,
+            num_subtasks_cancelled: self.num_subtasks_cancelled,
         }
     }
 
@@ -72,3 +74,4 @@ impl Provider for UndercutBudgetProvider {
         self
     }
 }
+

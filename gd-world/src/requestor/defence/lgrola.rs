@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
 
+use gd_world_derive::DerefDefenceMechanismCommon;
 use log::debug;
 use statrs::statistics::{OrderStatistics, Statistics};
 
@@ -10,7 +10,7 @@ use crate::id::Id;
 use crate::task::subtask;
 use crate::task::{SubTask, Task};
 
-#[derive(Debug)]
+#[derive(Debug, DerefDefenceMechanismCommon)]
 pub struct LGRola {
     common: DefenceMechanismCommon,
     task_usages: HashMap<Id, Vec<f64>>,
@@ -153,20 +153,6 @@ impl DefenceMechanism for LGRola {
 
     fn as_dm_common_mut(&mut self) -> &mut DefenceMechanismCommon {
         &mut self.common
-    }
-}
-
-impl Deref for LGRola {
-    type Target = DefenceMechanismCommon;
-
-    fn deref(&self) -> &DefenceMechanismCommon {
-        self.as_dm_common()
-    }
-}
-
-impl DerefMut for LGRola {
-    fn deref_mut(&mut self) -> &mut DefenceMechanismCommon {
-        self.as_dm_common_mut()
     }
 }
 
