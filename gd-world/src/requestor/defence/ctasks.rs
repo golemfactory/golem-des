@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::{Deref, DerefMut};
 
+use gd_world_derive::DerefDefenceMechanismCommon;
 use log::debug;
 use statrs::statistics::Statistics;
 
@@ -10,7 +10,7 @@ use crate::id::Id;
 use crate::task::subtask;
 use crate::task::{SubTask, Task};
 
-#[derive(Debug)]
+#[derive(Debug, DerefDefenceMechanismCommon)]
 pub struct CTasks {
     common: DefenceMechanismCommon,
     task_usages: HashMap<Id, Vec<f64>>,
@@ -116,20 +116,6 @@ impl DefenceMechanism for CTasks {
 
     fn as_dm_common_mut(&mut self) -> &mut DefenceMechanismCommon {
         &mut self.common
-    }
-}
-
-impl Deref for CTasks {
-    type Target = DefenceMechanismCommon;
-
-    fn deref(&self) -> &DefenceMechanismCommon {
-        self.as_dm_common()
-    }
-}
-
-impl DerefMut for CTasks {
-    fn deref_mut(&mut self) -> &mut DefenceMechanismCommon {
-        self.as_dm_common_mut()
     }
 }
 

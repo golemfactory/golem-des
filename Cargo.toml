@@ -4,6 +4,7 @@ members = [
   'gd-tools',
   'gd-engine',
   'gd-world',
+  'gd-world-derive',
 ]
 
 [profile.release]

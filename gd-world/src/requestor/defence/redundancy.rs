@@ -1,8 +1,8 @@
 use super::{DefenceMechanism, DefenceMechanismCommon};
 
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
 
+use gd_world_derive::DerefDefenceMechanismCommon;
 use log::debug;
 
 use crate::id::Id;
@@ -51,7 +51,7 @@ impl VerificationMap {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, DerefDefenceMechanismCommon)]
 pub struct Redundancy {
     common: DefenceMechanismCommon,
     verification_map: VerificationMap,
@@ -152,20 +152,6 @@ impl DefenceMechanism for Redundancy {
 
     fn as_dm_common_mut(&mut self) -> &mut DefenceMechanismCommon {
         &mut self.common
-    }
-}
-
-impl Deref for Redundancy {
-    type Target = DefenceMechanismCommon;
-
-    fn deref(&self) -> &DefenceMechanismCommon {
-        self.as_dm_common()
-    }
-}
-
-impl DerefMut for Redundancy {
-    fn deref_mut(&mut self) -> &mut DefenceMechanismCommon {
-        self.as_dm_common_mut()
     }
 }
 
