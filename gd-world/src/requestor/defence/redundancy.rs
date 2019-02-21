@@ -237,7 +237,7 @@ mod tests {
 
         assert_almost_eq!(*redundancy.ratings.get(&p1.0).unwrap(), 2.0, 1e-5);
         assert_almost_eq!(*redundancy.ratings.get(&p2.0).unwrap(), 0.75, 1e-5);
-        assert!(redundancy.blacklisted_set.contains(&p1.0));
+        assert!(redundancy.blacklisted_set.contains_key(&p1.0));
     }
 
     #[test]

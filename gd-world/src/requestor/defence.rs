@@ -1,23 +1,56 @@
 mod ctasks;
+mod lgrola;
 mod redundancy;
 
 pub use self::ctasks::CTasks;
+pub use self::lgrola::LGRola;
 pub use self::redundancy::Redundancy;
 
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 use log::{debug, warn};
+use num_traits::{NumAssign, NumCast};
 use serde_derive::Deserialize;
 
 use crate::id::Id;
 use crate::task::subtask;
 use crate::task::{SubTask, Task};
 
+#[derive(Debug)]
+enum BanDuration<T>
+where
+    T: fmt::Debug + NumAssign + NumCast,
+{
+    Until(T),
+    Indefinitely,
+}
+
+impl<T> BanDuration<T>
+where
+    T: fmt::Debug + NumAssign + NumCast,
+{
+    fn is_expired(&self) -> bool {
+        match self {
+            BanDuration::Until(value) => {
+                *value == NumCast::from(0).expect("could not convert int to T")
+            }
+            BanDuration::Indefinitely => false,
+        }
+    }
+
+    fn decrement(&mut self) {
+        if let BanDuration::Until(ref mut value) = *self {
+            *value -= NumCast::from(1).expect("could not convert int to T")
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub enum DefenceMechanismType {
+    LGRola,
     CTasks,
     Redundancy,
 }
@@ -27,6 +60,7 @@ impl DefenceMechanismType {
         match self {
             DefenceMechanismType::CTasks => Box::new(CTasks::new(requestor_id)),
             DefenceMechanismType::Redundancy => Box::new(Redundancy::new(requestor_id)),
+            DefenceMechanismType::LGRola => Box::new(LGRola::new(requestor_id)),
         }
     }
 }
@@ -66,7 +100,7 @@ impl DerefMut for DefenceMechanism {
 pub struct DefenceMechanismCommon {
     requestor_id: Id,
     ratings: HashMap<Id, f64>,
-    blacklisted_set: HashSet<Id>,
+    blacklisted_set: HashMap<Id, BanDuration<i64>>,
 }
 
 impl DefenceMechanismCommon {
@@ -76,7 +110,7 @@ impl DefenceMechanismCommon {
         DefenceMechanismCommon {
             requestor_id: requestor_id,
             ratings: HashMap::new(),
-            blacklisted_set: HashSet::new(),
+            blacklisted_set: HashMap::new(),
         }
     }
 
@@ -100,7 +134,8 @@ impl DefenceMechanismCommon {
         if *rating >= Self::MAX_RATING {
             debug!("R{}:P{} blacklisted", self.requestor_id, provider_id);
 
-            self.blacklisted_set.insert(*provider_id);
+            self.blacklisted_set
+                .insert(*provider_id, BanDuration::Indefinitely);
         }
     }
 
@@ -115,7 +150,7 @@ impl DefenceMechanismCommon {
 
         let bids: Vec<(Id, f64)> = bids
             .into_iter()
-            .filter(|(id, _)| !self.blacklisted_set.contains(&id))
+            .filter(|(id, _)| !self.blacklisted_set.contains_key(&id))
             .collect();
 
         debug!(
@@ -174,7 +209,7 @@ mod tests {
         assert!(dm.blacklisted_set.is_empty());
         assert_eq!(dm.filter_offers(vec![bid1, bid2]), vec![bid1, bid2]);
 
-        dm.blacklisted_set.insert(bid1.0);
+        dm.blacklisted_set.insert(bid1.0, BanDuration::Indefinitely);
 
         assert!(!dm.blacklisted_set.is_empty());
         assert_eq!(dm.filter_offers(vec![bid1, bid2]), vec![bid2]);
@@ -188,6 +223,6 @@ mod tests {
         dm.ratings.insert(provider.0, provider.1);
         dm.update_provider_rating(&provider.0, 2.0);
 
-        assert!(dm.blacklisted_set.contains(&provider.0));
+        assert!(dm.blacklisted_set.contains_key(&provider.0));
     }
 }

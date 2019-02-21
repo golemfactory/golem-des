@@ -29,7 +29,7 @@ Options:
     json                            JSON file with simulation parameters.
     -v --verbose                    Show debug logs.
     -h --help                       Show this screen.
-    --defence=<defence>             Defence mechanism (ctasks or redundancy) [default: redundancy].
+    --defence=<defence>             Defence mechanism (ctasks, lgrola, or redundancy) [default: redundancy].
     --repetitions=<repetitions>     Number of repetitions [default: 100].
     --output-dir=<output-dir>       Output directory for statistics.
 ";
