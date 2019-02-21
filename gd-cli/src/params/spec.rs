@@ -1,4 +1,5 @@
 use gd_world::prelude::*;
+use gd_world::requestor::DefenceMechanismType;
 use serde_derive::Deserialize;
 
 use super::{Generator, ProviderBehaviour};
@@ -15,11 +16,20 @@ pub struct RequestorSpec {
 }
 
 impl RequestorSpec {
-    pub fn into_requestor<'a, Rng>(&self, rng: &'a mut Rng) -> Requestor
+    pub fn into_requestor<'a, Rng>(
+        &self,
+        rng: &'a mut Rng,
+        defence_mechanism_type: DefenceMechanismType,
+    ) -> Requestor
     where
         Rng: rand::Rng,
     {
-        let mut requestor = Requestor::with_id(self.id, self.max_price, self.budget_factor);
+        let mut requestor = Requestor::with_id(
+            self.id,
+            self.max_price,
+            self.budget_factor,
+            defence_mechanism_type,
+        );
         requestor.task_queue_mut().append(
             self.tasks
                 .iter()

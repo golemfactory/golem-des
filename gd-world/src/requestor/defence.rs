@@ -1,5 +1,7 @@
+mod ctasks;
 mod redundancy;
 
+pub use self::ctasks::CTasks;
 pub use self::redundancy::Redundancy;
 
 use std::cmp::Ordering;
@@ -10,12 +12,6 @@ use std::ops::{Deref, DerefMut};
 use log::{debug, warn};
 use serde_derive::Deserialize;
 
-// mod ctasks;
-// mod lgrola;
-
-// pub use self::ctasks::CTasks;
-// pub use self::lgrola::LGRola;
-
 use crate::id::Id;
 use crate::task::subtask;
 use crate::task::{SubTask, Task};
@@ -23,17 +19,14 @@ use crate::task::{SubTask, Task};
 #[derive(Copy, Clone, Debug, Deserialize)]
 pub enum DefenceMechanismType {
     CTasks,
-    LGRola,
     Redundancy,
 }
 
 impl DefenceMechanismType {
     pub fn into_dm(self, requestor_id: Id) -> Box<dyn DefenceMechanism> {
         match self {
-            // DefenceMechanismType::CTasks => Box::new(CTasks::new()),
-            // DefenceMechanismType::LGRola => Box::new(LGRola::new()),
+            DefenceMechanismType::CTasks => Box::new(CTasks::new(requestor_id)),
             DefenceMechanismType::Redundancy => Box::new(Redundancy::new(requestor_id)),
-            _ => unimplemented!(),
         }
     }
 }
@@ -48,6 +41,8 @@ pub trait DefenceMechanism: fmt::Debug {
         provider_id: &Id,
         reported_usage: Option<f64>,
     ) -> subtask::Status;
+
+    fn complete_task(&mut self);
 
     fn as_dm_common(&self) -> &DefenceMechanismCommon;
     fn as_dm_common_mut(&mut self) -> &mut DefenceMechanismCommon;
@@ -75,6 +70,8 @@ pub struct DefenceMechanismCommon {
 }
 
 impl DefenceMechanismCommon {
+    const MAX_RATING: f64 = 2.0;
+
     fn new(requestor_id: Id) -> DefenceMechanismCommon {
         DefenceMechanismCommon {
             requestor_id: requestor_id,
@@ -89,6 +86,21 @@ impl DefenceMechanismCommon {
                 "R{}:rating for P{} already existed, replacing: {} => {}",
                 self.requestor_id, provider_id, old_rating, reported_usage
             )
+        }
+    }
+
+    fn get_provider_rating(&self, provider_id: &Id) -> f64 {
+        *self.ratings.get(provider_id).expect("rating not found")
+    }
+
+    fn update_provider_rating(&mut self, provider_id: &Id, new_rating: f64) {
+        let rating = self.ratings.get_mut(provider_id).expect("rating not found");
+        *rating = new_rating;
+
+        if *rating >= Self::MAX_RATING {
+            debug!("R{}:P{} blacklisted", self.requestor_id, provider_id);
+
+            self.blacklisted_set.insert(*provider_id);
         }
     }
 
@@ -166,5 +178,16 @@ mod tests {
 
         assert!(!dm.blacklisted_set.is_empty());
         assert_eq!(dm.filter_offers(vec![bid1, bid2]), vec![bid2]);
+    }
+
+    #[test]
+    fn test_update_provider_rating() {
+        let mut dm = DefenceMechanismCommon::new(Id::new());
+        let provider = (Id::new(), 0.25);
+
+        dm.ratings.insert(provider.0, provider.1);
+        dm.update_provider_rating(&provider.0, 2.0);
+
+        assert!(dm.blacklisted_set.contains(&provider.0));
     }
 }
