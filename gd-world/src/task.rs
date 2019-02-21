@@ -3,6 +3,8 @@ use std::fmt;
 
 use crate::id::Id;
 
+pub use subtask::SubTask;
+
 #[derive(Clone, Debug)]
 pub struct Task {
     id: Id,
@@ -62,40 +64,51 @@ impl PartialEq for Task {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct SubTask {
-    id: Id,
-    pub nominal_usage: f64,
-    pub budget: f64,
-}
+pub mod subtask {
+    use super::*;
 
-impl SubTask {
-    pub fn new(nominal_usage: f64, budget: f64) -> SubTask {
-        SubTask {
-            id: Id::new(),
-            nominal_usage: nominal_usage,
-            budget: budget,
+    #[derive(Debug, PartialEq)]
+    pub enum Status {
+        Pending,
+        Cancelled,
+        Done,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub struct SubTask {
+        id: Id,
+        pub nominal_usage: f64,
+        pub budget: f64,
+    }
+
+    impl SubTask {
+        pub fn new(nominal_usage: f64, budget: f64) -> SubTask {
+            SubTask {
+                id: Id::new(),
+                nominal_usage: nominal_usage,
+                budget: budget,
+            }
+        }
+
+        pub fn id(&self) -> &Id {
+            &self.id
         }
     }
 
-    pub fn id(&self) -> &Id {
-        &self.id
+    impl std::fmt::Display for SubTask {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(
+                f,
+                "SubTask({}, {}, {})",
+                self.id, self.nominal_usage, self.budget
+            )
+        }
     }
-}
 
-impl std::fmt::Display for SubTask {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "SubTask({}, {}, {})",
-            self.id, self.nominal_usage, self.budget
-        )
-    }
-}
-
-impl PartialEq for SubTask {
-    fn eq(&self, other: &SubTask) -> bool {
-        self.id == other.id
+    impl PartialEq for SubTask {
+        fn eq(&self, other: &SubTask) -> bool {
+            self.id == other.id
+        }
     }
 }
 
