@@ -1,7 +1,9 @@
-# golem-des &emsp; [![Build Status]][travis]
+# golem-des &emsp; [![Build Status]][travis] [![Rustc Version 1.32+]][rustc]
 
 [Build Status]: https://travis-ci.org/golemfactory/golem-des.svg?branch=master
 [travis]: https://travis-ci.org/golemfactory/golem-des
+[Rustc Version 1.32+]: https://img.shields.io/badge/rustc-1.32+-lightgray.svg
+[rustc]: https://blog.rust-lang.org/2019/01/17/Rust-1.32.0.html
 
 Golem-des is a Golem marketplace agent-based DES simulation package. It is currently designed to simulate the market with usages that will be standard in Golem with Golem Clay release.
 
@@ -18,12 +20,14 @@ $ sudo apt-get install gnuplot libgsl23 libgsl-dev
 The shipped, basic version of the simulator's CLI can be executed from the command line as follows (here, we assume you're at the top of the crate, i.e., in `golem-des`)
 
 ```
-$ ./target/release/run <some-simulation-scenario-in-json> --repetitions=100 --output-dir=<output-dir>
+$ ./target/release/run <some-simulation-scenario-in-json> --repetitions=100 --output-dir=<output-dir> --defence=<mechanism>
 ```
 
-By default, the simulator will repeat the scenario for 100 times, hence, `--repetitions` can be omitted unless you want to run the simulation for a specific number of times.
+Firstly, by default, the simulator will repeat the scenario for 100 times, hence, `--repetitions` can be omitted unless you want to run the simulation for a specific number of times.
 
-The simulator will save the resultant statistics in the current working directory. If you want to specify an alternative directory, pass it as an optional argument `--output-dir`.
+Secondly, the default defence mechanism used is the `redundancy` method but other possibilities include `ctasks` and `lgrola`. If you would like to try them out, you can specify it using the `--defence` optional flag.
+
+Lastly, the simulator will save the resultant statistics in the current working directory. If you want to specify an alternative directory, pass it as an optional argument `--output-dir`.
 
 ### Specifying the simulation scenario
 The only required argument for the simulator is the simulation scenario in JSON format as evidenced in the example invocation above. Several example scenarios in JSON format can be found in [scenarios/](scenarios) directory. However, the general structure can be summarised as follows
