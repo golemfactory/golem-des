@@ -126,7 +126,7 @@ mod tests {
     use statrs::assert_almost_eq;
 
     #[test]
-    fn test_assign_subtasks() {
+    fn assign_subtasks() {
         let mut ctasks = CTasks::new(Id::new());
         let s1 = SubTask::new(1.0, 1.0);
         let s2 = SubTask::new(1.0, 1.0);
@@ -145,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn test_complete_task() {
+    fn complete_task() {
         let mut ctasks = CTasks::new(Id::new());
 
         let id1 = Id::new();

@@ -142,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_matches() {
+    fn matches() {
         let into = |tv: &TestValue| tv.item();
 
         let partition = Partition::new(None);
@@ -173,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    fn test_degenerate_partition() {
+    fn degenerate_partition() {
         let partitions = partition(Vec::<TestValue>::new(), &[0.0, 0.25]);
         assert!(partitions.is_empty());
 
@@ -191,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn test_partition() {
+    fn valid_partition() {
         let values = vec![
             TestValue(0.15),
             TestValue(0.45),

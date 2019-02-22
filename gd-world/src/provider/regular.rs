@@ -66,3 +66,28 @@ impl Provider for RegularProvider {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use statrs::assert_almost_eq;
+
+    use crate::task::SubTask;
+
+    #[test]
+    fn report_usage() {
+        let mut provider = RegularProvider::new(0.1, 0.25);
+        let subtask = SubTask::new(100.0, 100.0);
+
+        assert_almost_eq!(provider.report_usage(&subtask, 0.1), 25.0, 1e-6);
+        assert_almost_eq!(provider.report_usage(&subtask, 0.5), 25.0, 1e-6);
+        assert_almost_eq!(provider.report_usage(&subtask, 1.0), 25.0, 1e-6);
+
+        provider.usage_factor = 0.75;
+
+        assert_almost_eq!(provider.report_usage(&subtask, 0.1), 75.0, 1e-6);
+        assert_almost_eq!(provider.report_usage(&subtask, 0.5), 75.0, 1e-6);
+        assert_almost_eq!(provider.report_usage(&subtask, 1.0), 75.0, 1e-6);
+    }
+}

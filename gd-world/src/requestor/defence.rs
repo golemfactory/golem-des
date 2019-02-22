@@ -190,7 +190,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rank_offers() {
+    fn rank_offers() {
         let mut dm = DefenceMechanismCommon::new(Id::new());
         let bid1 = (Id::new(), 2.5); // (provider_id, bid/offer)
         let bid2 = (Id::new(), 0.5);
@@ -201,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_offers() {
+    fn filter_offers() {
         let mut dm = DefenceMechanismCommon::new(Id::new());
         let bid1 = (Id::new(), 1.0); // (provider_id, bid/offer)
         let bid2 = (Id::new(), 2.0);
@@ -216,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update_provider_rating() {
+    fn update_provider_rating() {
         let mut dm = DefenceMechanismCommon::new(Id::new());
         let provider = (Id::new(), 0.25);
 

@@ -162,7 +162,7 @@ mod tests {
     use statrs::assert_almost_eq;
 
     #[test]
-    fn test_insert_verification() {
+    fn insert_verification() {
         let mut vmap = VerificationMap::new();
         let id = Id::new();
         vmap.insert_key(id);
@@ -200,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update_rating() {
+    fn update_rating() {
         let mut redundancy = Redundancy::new(Id::new());
         let p1 = (Id::new(), 0.25, 25.0); // (provider_id, rating, usage)
         let p2 = (Id::new(), 0.75, 75.0);
@@ -227,7 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn test_assign_subtasks() {
+    fn assign_subtasks() {
         let mut redundancy = Redundancy::new(Id::new());
         let subtask = SubTask::new(1.0, 1.0);
         let mut task = Task::new();
@@ -244,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_subtask_successful() {
+    fn verify_subtask_successful() {
         let mut redundancy = Redundancy::new(Id::new());
 
         let p1 = (Id::new(), 0.25, 100.0);
@@ -266,7 +266,7 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_subtask_partial_success() {
+    fn verify_subtask_partial_success() {
         {
             let mut redundancy = Redundancy::new(Id::new());
 
@@ -311,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_subtask_failed() {
+    fn verify_subtask_failed() {
         let mut redundancy = Redundancy::new(Id::new());
 
         let p1 = (Id::new(), 0.25, 100.0);

@@ -251,7 +251,7 @@ mod tests {
     use statrs::assert_almost_eq;
 
     #[test]
-    fn test_send_payment() {
+    fn send_payment() {
         let mut requestor = Requestor::new(1.0, 1.0, DefenceMechanismType::Redundancy);
         let p1 = (SubTask::new(100.0, 100.0), Id::new(), 0.1, 50.0); // (subtask, provider_id, bid, usage)
 
@@ -262,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn test_complete_task() {
+    fn complete_task() {
         let mut requestor = Requestor::new(1.0, 1.0, DefenceMechanismType::Redundancy);
         let task = Task::new();
         requestor.task_queue.push(task.clone());
