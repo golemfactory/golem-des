@@ -42,7 +42,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pop_repeating() {
+    fn pop_repeating() {
         let mut task_queue = TaskQueue::new();
 
         assert!(task_queue.repeating);
@@ -55,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pop_nonrepeating() {
+    fn pop_nonrepeating() {
         let mut task_queue = TaskQueue::new();
         task_queue.repeating = false;
 

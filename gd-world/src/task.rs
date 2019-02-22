@@ -117,7 +117,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_task_states() {
+    fn task_states() {
         let mut task = Task::new();
 
         assert!(!task.is_pending());

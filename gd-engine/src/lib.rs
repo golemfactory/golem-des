@@ -84,7 +84,7 @@ mod tests {
     use super::*;
 
     #[test]
-    pub fn test_event_queue() {
+    pub fn event_queue() {
         let mut engine = Engine::new();
         assert!(engine.events.is_empty());
         assert_eq!(engine.now(), 0.0);

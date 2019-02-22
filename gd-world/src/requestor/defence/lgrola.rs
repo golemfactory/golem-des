@@ -161,7 +161,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_assign_subtasks() {
+    fn assign_subtasks() {
         let mut lgrola = LGRola::new(Id::new());
         let s1 = SubTask::new(1.0, 1.0);
         let s2 = SubTask::new(1.0, 1.0);
@@ -180,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn test_complete_task() {
+    fn complete_task() {
         let mut lgrola = LGRola::new(Id::new());
 
         for _ in 0..25 {

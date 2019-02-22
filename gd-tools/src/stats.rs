@@ -49,7 +49,7 @@ mod tests {
     use statrs::assert_almost_eq;
 
     #[test]
-    fn test_confidence_interval_for_mean() {
+    fn confidence_interval_for_mean() {
         let values = &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
         let ci = values.confidence_interval_for_mean(0.95);
         assert_almost_eq!(1.963, ci, 1e-3);

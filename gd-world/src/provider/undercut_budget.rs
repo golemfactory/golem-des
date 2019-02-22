@@ -75,3 +75,25 @@ impl Provider for UndercutBudgetProvider {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use statrs::assert_almost_eq;
+
+    use crate::task::SubTask;
+
+    #[test]
+    fn report_usage() {
+        let mut provider = UndercutBudgetProvider::new(0.1, 0.1, 0.0);
+        let subtask = SubTask::new(100.0, 100.0);
+
+        assert_almost_eq!(provider.report_usage(&subtask, 1.0), 100.0, 1e-6);
+        assert_almost_eq!(provider.report_usage(&subtask, 0.1) * 0.1, 100.0, 1e-6);
+
+        provider.epsilon = 0.5;
+
+        assert_almost_eq!(provider.report_usage(&subtask, 1.0), 50.0, 1e-6);
+        assert_almost_eq!(provider.report_usage(&subtask, 0.1) * 0.1, 50.0, 1e-6);
+    }
+}

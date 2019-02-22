@@ -63,7 +63,7 @@ mod tests {
     use serde_test::{assert_de_tokens, Token};
 
     #[test]
-    fn test_deserialize_provider_behaviour() {
+    fn deserialize_provider_behaviour() {
         assert_de_tokens(
             &ProviderBehaviour::Regular,
             &[
@@ -99,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_fixed() {
+    fn deserialize_fixed() {
         assert_de_tokens(
             &Generator::Fixed(1.0),
             &[
@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_choice() {
+    fn deserialize_choice() {
         assert_de_tokens(
             &Generator::Choice(vec![0.5, 1.0, 2.0]),
             &[
@@ -127,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_uniform() {
+    fn deserialize_uniform() {
         assert_de_tokens(
             &Generator::Uniform(1.0, 2.0),
             &[
@@ -142,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_lognormal() {
+    fn deserialize_lognormal() {
         assert_de_tokens(
             &Generator::LogNormal(0.0, 1.0),
             &[
@@ -157,7 +157,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_normal() {
+    fn deserialize_normal() {
         assert_de_tokens(
             &Generator::Normal(0.0, 0.5),
             &[
@@ -172,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_exp() {
+    fn deserialize_exp() {
         assert_de_tokens(
             &Generator::Exp(1.0),
             &[

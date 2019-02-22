@@ -269,7 +269,7 @@ mod tests {
     use statrs::assert_almost_eq;
 
     #[test]
-    fn test_send_offer() {
+    fn send_offer() {
         let mut provider = ProviderCommon::new(Id::new(), 1.0, 1.0);
         provider.state = State::Idle;
 
@@ -281,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn test_increase_profit_margin() {
+    fn increase_profit_margin() {
         let mut provider = ProviderCommon::new(Id::new(), 1.0, 1.0);
 
         assert_almost_eq!(provider.profit_margin, 1.0, 1e-5);
@@ -292,7 +292,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decrease_profit_margin() {
+    fn decrease_profit_margin() {
         let mut provider = ProviderCommon::new(Id::new(), 1.0, 1.0);
 
         assert_almost_eq!(provider.profit_margin, 1.0, 1e-5);
