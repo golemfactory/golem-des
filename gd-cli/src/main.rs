@@ -1,3 +1,5 @@
+#![warn(clippy::all)]
+
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
@@ -18,7 +20,7 @@ mod params;
 
 use crate::params::*;
 
-const USAGE: &'static str = "
+const USAGE: &str = "
 Golem marketplace agent-based DES simulator
 
 Usage:
@@ -71,13 +73,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             // create pre-specified actors
             if let Some(rs) = &params.requestors {
                 for spec in rs {
-                    requestors.push(spec.into_requestor(&mut rng, args.flag_defence));
+                    requestors.push(spec.as_requestor(&mut rng, args.flag_defence));
                 }
             }
 
             if let Some(ps) = &params.providers {
                 for spec in ps {
-                    providers.push(spec.into_provider());
+                    providers.push(spec.as_provider());
                 }
             }
 
@@ -120,7 +122,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
 
         let name =
-            String::from(fname) + "_" + &id.map(|value| value.to_string()).unwrap_or(String::new());
+            String::from(fname) + "_" + &id.map(|value| value.to_string()).unwrap_or_default();
         path.join(name).with_extension("csv")
     };
 

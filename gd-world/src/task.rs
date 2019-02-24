@@ -5,7 +5,7 @@ use crate::id::Id;
 
 pub use subtask::SubTask;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Task {
     id: Id,
     size: usize,
@@ -14,13 +14,8 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new() -> Task {
-        Task {
-            id: Id::new(),
-            size: 0,
-            pending: VecDeque::new(),
-            done: VecDeque::new(),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn push_pending(&mut self, subtask: SubTask) {
@@ -37,7 +32,7 @@ impl Task {
     }
 
     pub fn is_pending(&self) -> bool {
-        self.pending.len() > 0
+        !self.pending.is_empty()
     }
 
     pub fn is_done(&self) -> bool {
@@ -59,7 +54,7 @@ impl std::fmt::Display for Task {
 }
 
 impl PartialEq for Task {
-    fn eq(&self, other: &Task) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
@@ -82,11 +77,11 @@ pub mod subtask {
     }
 
     impl SubTask {
-        pub fn new(nominal_usage: f64, budget: f64) -> SubTask {
-            SubTask {
+        pub fn new(nominal_usage: f64, budget: f64) -> Self {
+            Self {
                 id: Id::new(),
-                nominal_usage: nominal_usage,
-                budget: budget,
+                nominal_usage,
+                budget,
             }
         }
 
@@ -106,7 +101,7 @@ pub mod subtask {
     }
 
     impl PartialEq for SubTask {
-        fn eq(&self, other: &SubTask) -> bool {
+        fn eq(&self, other: &Self) -> bool {
             self.id == other.id
         }
     }

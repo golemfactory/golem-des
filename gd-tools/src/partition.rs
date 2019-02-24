@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::ops::Add;
 use std::slice::{Iter, IterMut};
-use std::vec::IntoIter;
 
 pub trait Partitionable {
     type Item: Add<Output = Self::Item> + Copy;
@@ -26,9 +25,9 @@ where
     T: PartialOrd + Add<Output = T> + Copy + fmt::Debug,
     P: fmt::Debug,
 {
-    fn new(lower: Option<T>) -> Partition<T, P> {
-        Partition {
-            lower: lower,
+    fn new(lower: Option<T>) -> Self {
+        Self {
+            lower,
             upper: None,
             values: Vec::new(),
         }
@@ -64,12 +63,25 @@ where
         self.values.iter_mut()
     }
 
-    pub fn into_iter(self) -> IntoIter<P> {
-        self.values.into_iter()
-    }
-
     pub fn len(&self) -> usize {
         self.values.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+}
+
+impl<T, P> IntoIterator for Partition<T, P>
+where
+    T: PartialOrd + Add<Output = T> + Copy + fmt::Debug,
+    P: fmt::Debug,
+{
+    type Item = P;
+    type IntoIter = ::std::vec::IntoIter<P>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.values.into_iter()
     }
 }
 
@@ -123,7 +135,7 @@ where
     T: PartialOrd + Add<Output = T> + Copy + fmt::Debug,
     P: Partitionable<Item = T> + fmt::Debug,
 {
-    partition_by(values, boundaries, |value| value.item())
+    partition_by(values, boundaries, Partitionable::item)
 }
 
 #[cfg(test)]

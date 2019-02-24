@@ -1,3 +1,5 @@
+#![warn(clippy::all)]
+
 use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::io::Read;
@@ -10,10 +12,10 @@ use serde_derive::Deserialize;
 use statrs::statistics::Statistics;
 
 use gd_tools::prelude::*;
-use gd_world::provider as provider;
-use gd_world::requestor as requestor;
+use gd_world::provider;
+use gd_world::requestor;
 
-const USAGE: &'static str = "
+const USAGE: &str = "
 Golem marketplace agent-based DES simulator.
 Analysis tool
 
@@ -50,11 +52,11 @@ pub fn plot<'a, P: AsRef<Path>>(
     );
 
     let count = values.len();
-    let widths = (0..count + 1).map(|_| 0.5);
+    let widths = (0..=count).map(|_| 0.5);
     let mut means: Vec<f64> = Vec::new();
     let mut cis: Vec<f64> = Vec::new();
 
-    for (_, value) in &values {
+    for value in values.values() {
         means.push(value.0);
         cis.push(value.1);
     }
@@ -68,7 +70,7 @@ pub fn plot<'a, P: AsRef<Path>>(
     figure
         .axes2d()
         .boxes_set_width(
-            0..count + 1,
+            0..=count,
             &means,
             widths,
             &[
@@ -77,7 +79,7 @@ pub fn plot<'a, P: AsRef<Path>>(
             ],
         )
         .y_error_bars(
-            0..count + 1,
+            0..=count,
             &means,
             &cis,
             &[
@@ -126,7 +128,9 @@ where
     let mut runs: HashMap<u64, Vec<provider::Stats>> = HashMap::new();
     for result in rdr.deserialize() {
         let result: provider::Stats = result?;
-        runs.entry(result.run_id).or_insert(Vec::new()).push(result);
+        runs.entry(result.run_id)
+            .or_insert_with(Vec::new)
+            .push(result);
     }
 
     let mut subtasks_computed: BTreeMap<provider::Behaviour, Vec<f64>> = BTreeMap::new();
@@ -144,7 +148,7 @@ where
         for result in results {
             by_behaviour
                 .entry(result.behaviour)
-                .or_insert(Vec::new())
+                .or_insert_with(Vec::new)
                 .push(result);
         }
 
@@ -180,7 +184,7 @@ where
 
             subtasks_computed
                 .entry(behaviour)
-                .or_insert(Vec::new())
+                .or_insert_with(Vec::new)
                 .push(num_subtasks_computed as f64 / all_subtasks_computed as f64 * 100.0);
 
             for partition in partition_by(results, &[0.25, 0.5, 0.75, 1.0], |p| p.usage_factor) {
@@ -188,25 +192,27 @@ where
                     (Some(lower), Some(upper)) => format!("{} - {}", lower, upper),
                     (None, Some(upper)) => format!("-inf - {}", upper),
                     (Some(lower), None) => format!("{} - inf", lower),
-                    (None, None) => format!("-inf - inf"),
+                    (None, None) => "-inf - inf".to_string(),
                 };
 
-                let prices = prices.entry(behaviour).or_insert(BTreeMap::new());
+                let prices = prices.entry(behaviour).or_insert_with(BTreeMap::new);
                 prices
                     .entry(key.clone())
-                    .or_insert(Vec::new())
+                    .or_insert_with(Vec::new)
                     .push(partition.iter().map(|p| p.price).mean());
 
-                let effective_prices = effective_prices.entry(behaviour).or_insert(BTreeMap::new());
+                let effective_prices = effective_prices
+                    .entry(behaviour)
+                    .or_insert_with(BTreeMap::new);
                 effective_prices
                     .entry(key.clone())
-                    .or_insert(Vec::new())
+                    .or_insert_with(Vec::new)
                     .push(partition.iter().map(|p| p.price * p.usage_factor).mean());
 
-                let revenues = revenues.entry(behaviour).or_insert(BTreeMap::new());
+                let revenues = revenues.entry(behaviour).or_insert_with(BTreeMap::new);
                 revenues
                     .entry(key)
-                    .or_insert(Vec::new())
+                    .or_insert_with(Vec::new)
                     .push(partition.into_iter().map(|p| p.revenue).mean());
             }
         }
@@ -307,7 +313,9 @@ where
     let mut runs: HashMap<u64, Vec<requestor::Stats>> = HashMap::new();
     for result in rdr.deserialize() {
         let result: requestor::Stats = result?;
-        runs.entry(result.run_id).or_insert(Vec::new()).push(result);
+        runs.entry(result.run_id)
+            .or_insert_with(Vec::new)
+            .push(result);
     }
 
     let mut subtasks_cancelled: BTreeMap<String, Vec<f64>> = BTreeMap::new();
@@ -319,15 +327,15 @@ where
                 (Some(lower), Some(upper)) => format!("{} - {}", lower, upper),
                 (None, Some(upper)) => format!("-inf - {}", upper),
                 (Some(lower), None) => format!("{} - inf", lower),
-                (None, None) => format!("-inf - inf"),
+                (None, None) => "-inf - inf".to_string(),
             };
 
             mean_cost
                 .entry(key.clone())
-                .or_insert(Vec::new())
+                .or_insert_with(Vec::new)
                 .push(partition.iter().map(|r| r.mean_cost).mean());
 
-            subtasks_cancelled.entry(key).or_insert(Vec::new()).push(
+            subtasks_cancelled.entry(key).or_insert_with(Vec::new).push(
                 partition
                     .into_iter()
                     .map(|r| {
@@ -387,7 +395,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let path = Path::new(&args.arg_csv_file);
     let rdr = csv::Reader::from_path(path)?;
 
-    let output_path = path.parent().unwrap_or(Path::new("."));
+    let output_path = path.parent().unwrap_or_else(|| Path::new("."));
 
     if args.cmd_providers {
         analyse_providers(rdr, output_path)?;

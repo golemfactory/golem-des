@@ -1,3 +1,5 @@
+#![warn(clippy::all)]
+
 pub mod id;
 pub mod logger;
 pub mod provider;

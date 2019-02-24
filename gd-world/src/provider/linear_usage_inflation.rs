@@ -13,22 +13,13 @@ pub struct LinearUsageInflationProvider {
 }
 
 impl LinearUsageInflationProvider {
-    pub fn new(
-        min_price: f64,
-        usage_factor: f64,
-        inflation_factor: f64,
-    ) -> LinearUsageInflationProvider {
-        LinearUsageInflationProvider::with_id(Id::new(), min_price, usage_factor, inflation_factor)
+    pub fn new(min_price: f64, usage_factor: f64, inflation_factor: f64) -> Self {
+        Self::with_id(Id::new(), min_price, usage_factor, inflation_factor)
     }
 
-    pub fn with_id(
-        id: Id,
-        min_price: f64,
-        usage_factor: f64,
-        inflation_factor: f64,
-    ) -> LinearUsageInflationProvider {
-        LinearUsageInflationProvider {
-            inflation_factor: inflation_factor,
+    pub fn with_id(id: Id, min_price: f64, usage_factor: f64, inflation_factor: f64) -> Self {
+        Self {
+            inflation_factor,
             common: ProviderCommon::new(id, min_price, usage_factor),
         }
     }
@@ -57,7 +48,7 @@ impl Provider for LinearUsageInflationProvider {
 
     fn into_stats(self: Box<Self>, run_id: u64) -> Stats {
         Stats {
-            run_id: run_id,
+            run_id,
             behaviour: Behaviour::LinearUsageInflation,
             min_price: self.min_price,
             usage_factor: self.usage_factor,

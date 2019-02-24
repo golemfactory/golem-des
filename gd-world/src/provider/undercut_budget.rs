@@ -12,18 +12,13 @@ pub struct UndercutBudgetProvider {
 }
 
 impl UndercutBudgetProvider {
-    pub fn new(min_price: f64, usage_factor: f64, epsilon: f64) -> UndercutBudgetProvider {
-        UndercutBudgetProvider::with_id(Id::new(), min_price, usage_factor, epsilon)
+    pub fn new(min_price: f64, usage_factor: f64, epsilon: f64) -> Self {
+        Self::with_id(Id::new(), min_price, usage_factor, epsilon)
     }
 
-    pub fn with_id(
-        id: Id,
-        min_price: f64,
-        usage_factor: f64,
-        epsilon: f64,
-    ) -> UndercutBudgetProvider {
-        UndercutBudgetProvider {
-            epsilon: epsilon,
+    pub fn with_id(id: Id, min_price: f64, usage_factor: f64, epsilon: f64) -> Self {
+        Self {
+            epsilon,
             common: ProviderCommon::new(id, min_price, usage_factor),
         }
     }
@@ -49,7 +44,7 @@ impl Provider for UndercutBudgetProvider {
 
     fn into_stats(self: Box<Self>, run_id: u64) -> Stats {
         Stats {
-            run_id: run_id,
+            run_id,
             behaviour: Behaviour::UndercutBudget,
             min_price: self.min_price,
             usage_factor: self.usage_factor,

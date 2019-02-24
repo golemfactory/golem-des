@@ -9,11 +9,8 @@ pub struct TaskQueue {
 }
 
 impl TaskQueue {
-    pub fn new() -> TaskQueue {
-        TaskQueue {
-            buffer: VecDeque::new(),
-            repeating: true,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn push(&mut self, task: Task) {
@@ -33,6 +30,15 @@ impl TaskQueue {
     pub fn append<It: IntoIterator<Item = Task>>(&mut self, tasks: It) {
         for task in tasks {
             self.push(task)
+        }
+    }
+}
+
+impl Default for TaskQueue {
+    fn default() -> Self {
+        Self {
+            buffer: VecDeque::new(),
+            repeating: true,
         }
     }
 }

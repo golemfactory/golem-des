@@ -50,8 +50,8 @@ impl Requestor {
     const MEAN_TASK_ARRIVAL_TIME: f64 = 3600.0;
     const READVERT_DELAY: f64 = 60.0;
 
-    pub fn new(max_price: f64, budget_factor: f64, dm_type: DefenceMechanismType) -> Requestor {
-        Requestor::with_id(Id::new(), max_price, budget_factor, dm_type)
+    pub fn new(max_price: f64, budget_factor: f64, dm_type: DefenceMechanismType) -> Self {
+        Self::with_id(Id::new(), max_price, budget_factor, dm_type)
     }
 
     pub fn with_id(
@@ -59,11 +59,11 @@ impl Requestor {
         max_price: f64,
         budget_factor: f64,
         dm_type: DefenceMechanismType,
-    ) -> Requestor {
-        Requestor {
-            id: id,
-            max_price: max_price,
-            budget_factor: budget_factor,
+    ) -> Self {
+        Self {
+            id,
+            max_price,
+            budget_factor,
             task: None,
             task_queue: TaskQueue::new(),
             defence_mechanism: dm_type.into_dm(id),
@@ -105,19 +105,17 @@ impl Requestor {
                 self.num_readvertisements += 1;
                 engine.schedule(Self::READVERT_DELAY, Event::TaskAdvertisement(self.id));
             }
-        } else {
-            if let Some(task) = self.task_queue.pop() {
-                self.task = Some(task);
-                self.num_tasks_advertised += 1;
-                engine.schedule(
-                    Exp::new(1.0 / Self::MEAN_TASK_ARRIVAL_TIME).sample(rng),
-                    Event::TaskAdvertisement(self.id),
-                );
-            }
+        } else if let Some(task) = self.task_queue.pop() {
+            self.task = Some(task);
+            self.num_tasks_advertised += 1;
+            engine.schedule(
+                Exp::new(1.0 / Self::MEAN_TASK_ARRIVAL_TIME).sample(rng),
+                Event::TaskAdvertisement(self.id),
+            );
         }
     }
 
-    pub fn receive_benchmark(&mut self, provider_id: &Id, reported_usage: f64) {
+    pub fn receive_benchmark(&mut self, provider_id: Id, reported_usage: f64) {
         self.defence_mechanism
             .insert_provider_rating(provider_id, reported_usage)
     }
@@ -132,7 +130,7 @@ impl Requestor {
     pub fn verify_subtask(
         &mut self,
         subtask: &SubTask,
-        provider_id: &Id,
+        provider_id: Id,
         reported_usage: Option<f64>,
     ) {
         debug!("R{}:verifying {}", self.id, subtask);
@@ -162,7 +160,7 @@ impl Requestor {
     pub fn send_payment(
         &mut self,
         subtask: &SubTask,
-        provider_id: &Id,
+        provider_id: Id,
         bid: f64,
         reported_usage: f64,
     ) -> Option<f64> {
@@ -203,7 +201,7 @@ impl Requestor {
 
     pub fn into_stats(self, run_id: u64) -> Stats {
         Stats {
-            run_id: run_id,
+            run_id,
             max_price: self.max_price,
             budget_factor: self.budget_factor,
             mean_cost: self.mean_cost.1 * 100.0,
@@ -255,7 +253,7 @@ mod tests {
         let mut requestor = Requestor::new(1.0, 1.0, DefenceMechanismType::Redundancy);
         let p1 = (SubTask::new(100.0, 100.0), Id::new(), 0.1, 50.0); // (subtask, provider_id, bid, usage)
 
-        assert_eq!(requestor.send_payment(&p1.0, &p1.1, p1.2, p1.3), Some(5.0));
+        assert_eq!(requestor.send_payment(&p1.0, p1.1, p1.2, p1.3), Some(5.0));
 
         assert_eq!(requestor.mean_cost.0, 1);
         assert_almost_eq!(requestor.mean_cost.1, 0.05, 1e-5);

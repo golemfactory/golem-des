@@ -67,13 +67,13 @@ pub trait Provider: fmt::Debug + fmt::Display {
 impl Deref for Provider {
     type Target = ProviderCommon;
 
-    fn deref(&self) -> &ProviderCommon {
+    fn deref(&self) -> &Self::Target {
         self.as_provider_common()
     }
 }
 
 impl DerefMut for Provider {
-    fn deref_mut(&mut self) -> &mut ProviderCommon {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_provider_common_mut()
     }
 }
@@ -102,11 +102,11 @@ impl ProviderCommon {
     const ALPHA: f64 = 1e-5;
     const BETA: f64 = 1e-5;
 
-    fn new(id: Id, min_price: f64, usage_factor: f64) -> ProviderCommon {
-        ProviderCommon {
-            id: id,
-            min_price: min_price,
-            usage_factor: usage_factor,
+    fn new(id: Id, min_price: f64, usage_factor: f64) -> Self {
+        Self {
+            id,
+            min_price,
+            usage_factor,
             state: State::Idle,
             profit_margin: 1.0,
             last_checkpoint: 0.0,
@@ -131,7 +131,7 @@ impl ProviderCommon {
 
     fn increase_profit_margin(&mut self, duration: f64) {
         let old_profit_margin = self.profit_margin;
-        self.profit_margin *= (ProviderCommon::BETA * duration).exp();
+        self.profit_margin *= (Self::BETA * duration).exp();
 
         debug!(
             "P{}:increasing profit margin: {} => {}, duration = {}",
@@ -141,7 +141,7 @@ impl ProviderCommon {
 
     fn decrease_profit_margin(&mut self, duration: f64) {
         let old_profit_margin = self.profit_margin;
-        self.profit_margin *= (-ProviderCommon::ALPHA * duration).exp();
+        self.profit_margin *= (-Self::ALPHA * duration).exp();
 
         debug!(
             "P{}:decreasing profit margin: {} => {}, duration = {}",
@@ -165,7 +165,7 @@ impl ProviderCommon {
         engine: &mut Engine<Event>,
         _rng: &mut Rng,
         subtask: &SubTask,
-        requestor_id: &Id,
+        requestor_id: Id,
         bid: f64,
     ) where
         Rng: rand::Rng,
@@ -183,18 +183,18 @@ impl ProviderCommon {
             // schedule budget exceeded event
             engine.schedule(
                 subtask.budget / bid,
-                Event::SubTaskBudgetExceeded(*subtask, *requestor_id, self.id),
+                Event::SubTaskBudgetExceeded(*subtask, requestor_id, self.id),
             );
         } else {
             // schedule subtask computed event
             engine.schedule(
                 expected_usage,
-                Event::SubTaskComputed(*subtask, *requestor_id, self.id, bid),
+                Event::SubTaskComputed(*subtask, requestor_id, self.id, bid),
             );
         }
     }
 
-    pub fn finish_computing(&mut self, now: f64, subtask: &SubTask, requestor_id: &Id) {
+    pub fn finish_computing(&mut self, now: f64, subtask: &SubTask, requestor_id: Id) {
         debug!(
             "P{}:finished computing {} of R{}",
             self.id, subtask, requestor_id,
@@ -207,23 +207,22 @@ impl ProviderCommon {
         self.last_checkpoint = now;
     }
 
-    pub fn receive_payment(&mut self, subtask: &SubTask, requestor_id: &Id, payment: Option<f64>) {
-        match payment {
-            Some(payment) => {
-                debug!(
-                    "P{}:received {} from R{} for {}",
-                    self.id, payment, requestor_id, subtask
-                );
-                self.revenue += payment;
-            }
-            None => debug!(
+    pub fn receive_payment(&mut self, subtask: &SubTask, requestor_id: Id, payment: Option<f64>) {
+        if let Some(payment) = payment {
+            debug!(
+                "P{}:received {} from R{} for {}",
+                self.id, payment, requestor_id, subtask
+            );
+            self.revenue += payment;
+        } else {
+            debug!(
                 "P{}:no payment received from R{} for {}",
                 self.id, requestor_id, subtask
-            ),
+            );
         }
     }
 
-    pub fn cancel_computing(&mut self, now: f64, subtask: &SubTask, requestor_id: &Id) {
+    pub fn cancel_computing(&mut self, now: f64, subtask: &SubTask, requestor_id: Id) {
         debug!(
             "P{}:budget exceeded for {} of R{}",
             self.id, subtask, requestor_id
@@ -300,6 +299,5 @@ mod tests {
         provider.decrease_profit_margin(1000.0);
 
         assert_almost_eq!(provider.profit_margin, 0.99004, 1e-5);
-
     }
 }

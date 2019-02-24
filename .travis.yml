@@ -1,27 +1,26 @@
 language: rust
 matrix:
+  fast_finish: true
   include:
-    - os: linux
-      rust: stable
-      dist: trusty
-    - os: linux
-      rust: nightly
-      dist: trusty
-    - os: osx
-      rust: stable
-    - os: osx
-      rust: nightly
+    - rust: stable
+      before_script:
+        - rustup component add clippy
+    - rust: beta
+      before_script:
+        - rustup component add clippy
+    - rust: nightly
+      before_script:
+        - rustup component add clippy --toolchain=nightly || cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy
+      allow_failures: true
 sudo: true
-env:
-  global:
-    - LD_LIBRARY_PATH=/usr/local/lib
 addons:
   apt:
     packages:
       - libgsl0-dev
-before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install gsl; fi
 branches:
   only:
     - master
+script:
+  - cargo clippy --all-targets --all-features
+  - cargo build
+  - cargo test

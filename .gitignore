@@ -3,3 +3,5 @@
 Cargo.lock
 *.swp
 .DS_Store
+.vscode
+*.code-workspace

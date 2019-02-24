@@ -1,3 +1,5 @@
+#![warn(clippy::all)]
+
 pub mod partition;
 pub mod stats;
 
