@@ -19,8 +19,8 @@ struct VerificationMap {
 }
 
 impl VerificationMap {
-    fn new() -> VerificationMap {
-        VerificationMap {
+    fn new() -> Self {
+        Self {
             map: HashMap::new(),
         }
     }
@@ -29,17 +29,17 @@ impl VerificationMap {
         self.map.insert(key, Vec::with_capacity(REDUNDANCY_FACTOR));
     }
 
-    fn insert_verification(&mut self, key: &Id, res: VerificationResult) -> Option<Vec<(Id, f64)>> {
-        if !self.map.contains_key(key) {
+    fn insert_verification(&mut self, key: Id, res: VerificationResult) -> Option<Vec<(Id, f64)>> {
+        if !self.map.contains_key(&key) {
             panic!("verification key not found");
         }
 
-        self.map.get_mut(key).unwrap().push(res);
+        self.map.get_mut(&key).unwrap().push(res);
 
-        if self.map.get(key).unwrap().len() == REDUNDANCY_FACTOR {
+        if self.map[&key].len() == REDUNDANCY_FACTOR {
             Some(
                 self.map
-                    .remove(key)
+                    .remove(&key)
                     .unwrap()
                     .into_iter()
                     .filter_map(|v| v)
@@ -58,8 +58,8 @@ pub struct Redundancy {
 }
 
 impl Redundancy {
-    pub fn new(requestor_id: Id) -> Redundancy {
-        Redundancy {
+    pub fn new(requestor_id: Id) -> Self {
+        Self {
             common: DefenceMechanismCommon::new(requestor_id),
             verification_map: VerificationMap::new(),
         }
@@ -69,7 +69,7 @@ impl Redundancy {
         let requestor_id = self.requestor_id;
         let (id1, d1) = p1;
         let (_, d2) = p2;
-        let old_rating = self.get_provider_rating(&id1);
+        let old_rating = self.get_provider_rating(id1);
         let new_rating = old_rating * d1 / d2;
 
         debug!(
@@ -77,7 +77,7 @@ impl Redundancy {
             requestor_id, id1, old_rating, new_rating
         );
 
-        self.update_provider_rating(&id1, new_rating);
+        self.update_provider_rating(id1, new_rating);
     }
 }
 
@@ -113,20 +113,22 @@ impl DefenceMechanism for Redundancy {
     fn verify_subtask(
         &mut self,
         subtask: &SubTask,
-        provider_id: &Id,
+        provider_id: Id,
         reported_usage: Option<f64>,
     ) -> subtask::Status {
         let ver_res = reported_usage.map(|usage| {
             let rating = self.ratings.get(&provider_id).expect("rating not found");
 
-            (*provider_id, usage / rating)
+            (provider_id, usage / rating)
         });
 
         if let Some(vers) = self
             .verification_map
-            .insert_verification(subtask.id(), ver_res)
+            .insert_verification(*subtask.id(), ver_res)
         {
-            if vers.len() > 0 {
+            if vers.is_empty() {
+                subtask::Status::Cancelled
+            } else {
                 if vers.len() == REDUNDANCY_FACTOR {
                     if vers[0].1 > vers[1].1 {
                         self.update_rating(vers[0], vers[1]);
@@ -136,8 +138,6 @@ impl DefenceMechanism for Redundancy {
                 }
 
                 subtask::Status::Done
-            } else {
-                subtask::Status::Cancelled
             }
         } else {
             subtask::Status::Pending
@@ -170,32 +170,32 @@ mod tests {
         let id1 = Id::new();
         let id2 = Id::new();
 
-        assert_eq!(vmap.insert_verification(&id, Some((id1, 1.0))), None);
+        assert_eq!(vmap.insert_verification(id, Some((id1, 1.0))), None);
         assert_eq!(
-            vmap.insert_verification(&id, Some((id2, 1.0))),
+            vmap.insert_verification(id, Some((id2, 1.0))),
             Some(vec![(id1, 1.0), (id2, 1.0)])
         );
         assert_eq!(vmap.map.get(&id), None);
 
         vmap.insert_key(id);
 
-        assert_eq!(vmap.insert_verification(&id, Some((id1, 1.0))), None);
-        assert_eq!(vmap.insert_verification(&id, None), Some(vec![(id1, 1.0)]));
+        assert_eq!(vmap.insert_verification(id, Some((id1, 1.0))), None);
+        assert_eq!(vmap.insert_verification(id, None), Some(vec![(id1, 1.0)]));
         assert_eq!(vmap.map.get(&id), None);
 
         vmap.insert_key(id);
 
-        assert_eq!(vmap.insert_verification(&id, None), None);
+        assert_eq!(vmap.insert_verification(id, None), None);
         assert_eq!(
-            vmap.insert_verification(&id, Some((id2, 1.0))),
+            vmap.insert_verification(id, Some((id2, 1.0))),
             Some(vec![(id2, 1.0)])
         );
         assert_eq!(vmap.map.get(&id), None);
 
         vmap.insert_key(id);
 
-        assert_eq!(vmap.insert_verification(&id, None), None);
-        assert_eq!(vmap.insert_verification(&id, None), Some(vec![]));
+        assert_eq!(vmap.insert_verification(id, None), None);
+        assert_eq!(vmap.insert_verification(id, None), Some(vec![]));
         assert_eq!(vmap.map.get(&id), None);
     }
 
@@ -209,20 +209,20 @@ mod tests {
 
         redundancy.update_rating((p1.0, p1.2 / p1.1), (p2.0, p2.2 / p2.1));
 
-        assert_almost_eq!(*redundancy.ratings.get(&p1.0).unwrap(), 0.25, 1e-5);
-        assert_almost_eq!(*redundancy.ratings.get(&p2.0).unwrap(), 0.75, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p1.0], 0.25, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p2.0], 0.75, 1e-5);
         assert!(redundancy.blacklisted_set.is_empty());
 
         redundancy.update_rating((p1.0, 200.0), (p2.0, p2.2 / p2.1));
 
-        assert_almost_eq!(*redundancy.ratings.get(&p1.0).unwrap(), 0.5, 1e-5);
-        assert_almost_eq!(*redundancy.ratings.get(&p2.0).unwrap(), 0.75, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p1.0], 0.5, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p2.0], 0.75, 1e-5);
         assert!(redundancy.blacklisted_set.is_empty());
 
         redundancy.update_rating((p1.0, 400.0), (p2.0, p2.2 / p2.1));
 
-        assert_almost_eq!(*redundancy.ratings.get(&p1.0).unwrap(), 2.0, 1e-5);
-        assert_almost_eq!(*redundancy.ratings.get(&p2.0).unwrap(), 0.75, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p1.0], 2.0, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p2.0], 0.75, 1e-5);
         assert!(redundancy.blacklisted_set.contains_key(&p1.0));
     }
 
@@ -256,11 +256,11 @@ mod tests {
         redundancy.verification_map.insert_key(*subtask.id());
 
         assert_eq!(
-            redundancy.verify_subtask(&subtask, &p1.0, Some(p1.2)),
+            redundancy.verify_subtask(&subtask, p1.0, Some(p1.2)),
             subtask::Status::Pending
         );
         assert_eq!(
-            redundancy.verify_subtask(&subtask, &p2.0, Some(p2.2)),
+            redundancy.verify_subtask(&subtask, p2.0, Some(p2.2)),
             subtask::Status::Done
         );
     }
@@ -279,11 +279,11 @@ mod tests {
             redundancy.verification_map.insert_key(*subtask.id());
 
             assert_eq!(
-                redundancy.verify_subtask(&subtask, &p1.0, Some(p1.2)),
+                redundancy.verify_subtask(&subtask, p1.0, Some(p1.2)),
                 subtask::Status::Pending
             );
             assert_eq!(
-                redundancy.verify_subtask(&subtask, &p1.0, None),
+                redundancy.verify_subtask(&subtask, p1.0, None),
                 subtask::Status::Done
             );
         }
@@ -300,11 +300,11 @@ mod tests {
             redundancy.verification_map.insert_key(*subtask.id());
 
             assert_eq!(
-                redundancy.verify_subtask(&subtask, &p1.0, None),
+                redundancy.verify_subtask(&subtask, p1.0, None),
                 subtask::Status::Pending
             );
             assert_eq!(
-                redundancy.verify_subtask(&subtask, &p1.0, Some(p2.2)),
+                redundancy.verify_subtask(&subtask, p1.0, Some(p2.2)),
                 subtask::Status::Done
             );
         }
@@ -323,11 +323,11 @@ mod tests {
         redundancy.verification_map.insert_key(*subtask.id());
 
         assert_eq!(
-            redundancy.verify_subtask(&subtask, &p1.0, None),
+            redundancy.verify_subtask(&subtask, p1.0, None),
             subtask::Status::Pending
         );
         assert_eq!(
-            redundancy.verify_subtask(&subtask, &p2.0, None),
+            redundancy.verify_subtask(&subtask, p2.0, None),
             subtask::Status::Cancelled
         );
     }

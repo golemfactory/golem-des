@@ -72,7 +72,7 @@ pub trait DefenceMechanism: fmt::Debug {
     fn verify_subtask(
         &mut self,
         subtask: &SubTask,
-        provider_id: &Id,
+        provider_id: Id,
         reported_usage: Option<f64>,
     ) -> subtask::Status;
 
@@ -85,13 +85,13 @@ pub trait DefenceMechanism: fmt::Debug {
 impl Deref for DefenceMechanism {
     type Target = DefenceMechanismCommon;
 
-    fn deref(&self) -> &DefenceMechanismCommon {
+    fn deref(&self) -> &Self::Target {
         self.as_dm_common()
     }
 }
 
 impl DerefMut for DefenceMechanism {
-    fn deref_mut(&mut self) -> &mut DefenceMechanismCommon {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_dm_common_mut()
     }
 }
@@ -106,16 +106,16 @@ pub struct DefenceMechanismCommon {
 impl DefenceMechanismCommon {
     const MAX_RATING: f64 = 2.0;
 
-    fn new(requestor_id: Id) -> DefenceMechanismCommon {
-        DefenceMechanismCommon {
-            requestor_id: requestor_id,
+    fn new(requestor_id: Id) -> Self {
+        Self {
+            requestor_id,
             ratings: HashMap::new(),
             blacklisted_set: HashMap::new(),
         }
     }
 
-    pub fn insert_provider_rating(&mut self, provider_id: &Id, reported_usage: f64) {
-        if let Some(old_rating) = self.ratings.insert(*provider_id, reported_usage) {
+    pub fn insert_provider_rating(&mut self, provider_id: Id, reported_usage: f64) {
+        if let Some(old_rating) = self.ratings.insert(provider_id, reported_usage) {
             warn!(
                 "R{}:rating for P{} already existed, replacing: {} => {}",
                 self.requestor_id, provider_id, old_rating, reported_usage
@@ -123,19 +123,22 @@ impl DefenceMechanismCommon {
         }
     }
 
-    fn get_provider_rating(&self, provider_id: &Id) -> f64 {
-        *self.ratings.get(provider_id).expect("rating not found")
+    fn get_provider_rating(&self, provider_id: Id) -> f64 {
+        *self.ratings.get(&provider_id).expect("rating not found")
     }
 
-    fn update_provider_rating(&mut self, provider_id: &Id, new_rating: f64) {
-        let rating = self.ratings.get_mut(provider_id).expect("rating not found");
+    fn update_provider_rating(&mut self, provider_id: Id, new_rating: f64) {
+        let rating = self
+            .ratings
+            .get_mut(&provider_id)
+            .expect("rating not found");
         *rating = new_rating;
 
         if *rating >= Self::MAX_RATING {
             debug!("R{}:P{} blacklisted", self.requestor_id, provider_id);
 
             self.blacklisted_set
-                .insert(*provider_id, BanDuration::Indefinitely);
+                .insert(provider_id, BanDuration::Indefinitely);
         }
     }
 
@@ -150,7 +153,7 @@ impl DefenceMechanismCommon {
 
         let bids: Vec<(Id, f64)> = bids
             .into_iter()
-            .filter(|(id, _)| !self.blacklisted_set.contains_key(&id))
+            .filter(|(id, _)| !self.blacklisted_set.contains_key(id))
             .collect();
 
         debug!(
@@ -166,8 +169,8 @@ impl DefenceMechanismCommon {
 
     fn rank_offers(&self, mut bids: Vec<(Id, f64)>) -> Vec<(Id, f64)> {
         bids.sort_unstable_by(|(x_id, x_bid), (y_id, y_bid)| {
-            let x_rating = self.ratings.get(&x_id).expect("rating not found");
-            let y_rating = self.ratings.get(&y_id).expect("rating not found");
+            let x_rating = self.ratings.get(x_id).expect("rating not found");
+            let y_rating = self.ratings.get(y_id).expect("rating not found");
 
             let x_price = x_bid * x_rating;
             let y_price = y_bid * y_rating;
@@ -221,7 +224,7 @@ mod tests {
         let provider = (Id::new(), 0.25);
 
         dm.ratings.insert(provider.0, provider.1);
-        dm.update_provider_rating(&provider.0, 2.0);
+        dm.update_provider_rating(provider.0, 2.0);
 
         assert!(dm.blacklisted_set.contains_key(&provider.0));
     }

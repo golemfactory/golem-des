@@ -21,13 +21,13 @@ pub enum Generator {
 
 impl Generator {
     pub fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> f64 {
-        match self {
-            &Generator::Fixed(value) => value,
-            &Generator::Choice(ref values) => *values.choose(rng).unwrap_or(&0.0),
-            &Generator::Uniform(min, max) => Uniform::new(min, max).sample(rng),
-            &Generator::LogNormal(mean, std) => LogNormal::new(mean, std).sample(rng),
-            &Generator::Normal(mean, std) => Normal::new(mean, std).sample(rng),
-            &Generator::Exp(mean) => Exp::new(mean).sample(rng),
+        match *self {
+            Generator::Fixed(value) => value,
+            Generator::Choice(ref values) => *values.choose(rng).unwrap_or(&0.0),
+            Generator::Uniform(min, max) => Uniform::new(min, max).sample(rng),
+            Generator::LogNormal(mean, std) => LogNormal::new(mean, std).sample(rng),
+            Generator::Normal(mean, std) => Normal::new(mean, std).sample(rng),
+            Generator::Exp(mean) => Exp::new(mean).sample(rng),
         }
     }
 }

@@ -16,7 +16,7 @@ pub struct RequestorSpec {
 }
 
 impl RequestorSpec {
-    pub fn into_requestor<'a, Rng>(
+    pub fn as_requestor<'a, Rng>(
         &self,
         rng: &'a mut Rng,
         defence_mechanism_type: DefenceMechanismType,
@@ -33,7 +33,7 @@ impl RequestorSpec {
         requestor.task_queue_mut().append(
             self.tasks
                 .iter()
-                .map(|t| t.into_task(rng, self.max_price, self.budget_factor)),
+                .map(|t| t.as_task(rng, self.max_price, self.budget_factor)),
         );
         requestor.task_queue_mut().repeating = self.repeating;
 
@@ -48,7 +48,7 @@ pub struct TaskSpec {
 }
 
 impl TaskSpec {
-    pub fn into_task<'a, Rng>(&self, rng: &'a mut Rng, max_price: f64, budget_factor: f64) -> Task
+    pub fn as_task<'a, Rng>(&self, rng: &'a mut Rng, max_price: f64, budget_factor: f64) -> Task
     where
         Rng: rand::Rng,
     {
@@ -76,7 +76,7 @@ pub struct ProviderSpec {
 }
 
 impl ProviderSpec {
-    pub fn into_provider(&self) -> Box<dyn Provider> {
+    pub fn as_provider(&self) -> Box<dyn Provider> {
         match self.behaviour {
             ProviderBehaviour::UndercutBudget(epsilon) => {
                 Box::new(UndercutBudgetProvider::with_id(

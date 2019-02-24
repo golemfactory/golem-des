@@ -33,9 +33,9 @@ impl<Rng> World<Rng>
 where
     Rng: rand::Rng,
 {
-    pub fn new(rng: Rng) -> World<Rng> {
-        World {
-            rng: rng,
+    pub fn new(rng: Rng) -> Self {
+        Self {
+            rng,
             engine: Engine::new(),
             requestors: HashMap::new(),
             providers: HashMap::new(),
@@ -88,7 +88,7 @@ where
     pub fn run(&mut self, until: f64) {
         self.started();
 
-        while let Some(payload) = self.engine.next() {
+        while let Some(event) = self.engine.pop() {
             let now = self.engine.now();
 
             if until < now {
@@ -96,7 +96,7 @@ where
             }
 
             debug!("W:now = {}", now);
-            self.handle(payload);
+            self.handle(event);
         }
 
         self.stopped();
@@ -123,13 +123,7 @@ where
                 .get_mut(&provider_id)
                 .expect("provider not found");
 
-            provider.receive_subtask(
-                &mut self.engine,
-                &mut self.rng,
-                &subtask,
-                &requestor_id,
-                bid,
-            );
+            provider.receive_subtask(&mut self.engine, &mut self.rng, &subtask, requestor_id, bid);
         }
     }
 
@@ -144,11 +138,11 @@ where
             .get_mut(&provider_id)
             .expect("provider not found");
 
-        provider.finish_computing(self.engine.now(), &subtask, &requestor_id);
+        provider.finish_computing(self.engine.now(), &subtask, requestor_id);
         let reported_usage = provider.report_usage(&subtask, bid);
-        requestor.verify_subtask(&subtask, &provider_id, Some(reported_usage));
-        let payment = requestor.send_payment(&subtask, &provider_id, bid, reported_usage);
-        provider.receive_payment(&subtask, &requestor_id, payment);
+        requestor.verify_subtask(&subtask, provider_id, Some(reported_usage));
+        let payment = requestor.send_payment(&subtask, provider_id, bid, reported_usage);
+        provider.receive_payment(&subtask, requestor_id, payment);
         requestor.complete_task();
 
         self.schedule_advertise();
@@ -165,8 +159,8 @@ where
             .get_mut(&provider_id)
             .expect("provider not found");
 
-        provider.cancel_computing(self.engine.now(), &subtask, &requestor_id);
-        requestor.verify_subtask(&subtask, &provider_id, None);
+        provider.cancel_computing(self.engine.now(), &subtask, requestor_id);
+        requestor.verify_subtask(&subtask, provider_id, None);
 
         self.schedule_advertise();
     }
@@ -191,9 +185,9 @@ where
             .map(|(&id, provider)| (id, provider.send_benchmark()))
             .collect();
 
-        for (_, requestor) in &mut self.requestors {
-            for (id, usage_factor) in &usage_factors {
-                requestor.receive_benchmark(id, *usage_factor);
+        for requestor in self.requestors.values_mut() {
+            for &(id, usage_factor) in &usage_factors {
+                requestor.receive_benchmark(id, usage_factor);
             }
         }
 
@@ -205,11 +199,11 @@ where
     fn stopped(&self) {
         debug!("W:simulation stopped");
 
-        for (_, requestor) in &self.requestors {
+        for requestor in self.requestors.values() {
             debug!("W:{}", requestor);
         }
 
-        for (_, provider) in &self.providers {
+        for provider in self.providers.values() {
             debug!("W:{}", provider);
         }
     }

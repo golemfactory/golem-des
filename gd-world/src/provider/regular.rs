@@ -11,12 +11,12 @@ pub struct RegularProvider {
 }
 
 impl RegularProvider {
-    pub fn new(min_price: f64, usage_factor: f64) -> RegularProvider {
-        RegularProvider::with_id(Id::new(), min_price, usage_factor)
+    pub fn new(min_price: f64, usage_factor: f64) -> Self {
+        Self::with_id(Id::new(), min_price, usage_factor)
     }
 
-    pub fn with_id(id: Id, min_price: f64, usage_factor: f64) -> RegularProvider {
-        RegularProvider {
+    pub fn with_id(id: Id, min_price: f64, usage_factor: f64) -> Self {
+        Self {
             common: ProviderCommon::new(id, min_price, usage_factor),
         }
     }
@@ -41,7 +41,7 @@ impl Provider for RegularProvider {
 
     fn into_stats(self: Box<Self>, run_id: u64) -> Stats {
         Stats {
-            run_id: run_id,
+            run_id,
             behaviour: Behaviour::Regular,
             min_price: self.min_price,
             usage_factor: self.usage_factor,

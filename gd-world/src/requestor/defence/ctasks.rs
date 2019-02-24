@@ -17,8 +17,8 @@ pub struct CTasks {
 }
 
 impl CTasks {
-    pub fn new(id: Id) -> CTasks {
-        CTasks {
+    pub fn new(id: Id) -> Self {
+        Self {
             common: DefenceMechanismCommon::new(id),
             task_usages: HashMap::new(),
         }
@@ -56,13 +56,13 @@ impl DefenceMechanism for CTasks {
     fn verify_subtask(
         &mut self,
         _subtask: &SubTask,
-        provider_id: &Id,
+        provider_id: Id,
         reported_usage: Option<f64>,
     ) -> subtask::Status {
         reported_usage.map_or(subtask::Status::Cancelled, |usage| {
             self.task_usages
-                .entry(*provider_id)
-                .or_insert(Vec::new())
+                .entry(provider_id)
+                .or_insert_with(Vec::new)
                 .push(usage);
 
             subtask::Status::Done
@@ -92,7 +92,7 @@ impl DefenceMechanism for CTasks {
         );
 
         for (id, usage) in task_usages {
-            let rating = self.get_provider_rating(&id);
+            let rating = self.get_provider_rating(id);
             let rating_relative_to_mean = rating / mean_rating;
             let usage_relative_to_mean = usage / mean_usage;
             let adjustment_factor = (usage_relative_to_mean / rating_relative_to_mean).sqrt();
@@ -104,7 +104,7 @@ impl DefenceMechanism for CTasks {
                 self.requestor_id, id, rating, new_rating
             );
 
-            self.update_provider_rating(&id, new_rating);
+            self.update_provider_rating(id, new_rating);
         }
 
         self.task_usages.clear();
@@ -161,8 +161,8 @@ mod tests {
 
         ctasks.complete_task();
 
-        assert_almost_eq!(*ctasks.ratings.get(&id1).unwrap(), 0.5, 1e-3);
-        assert_almost_eq!(*ctasks.ratings.get(&id3).unwrap(), 0.75, 1e-3);
+        assert_almost_eq!(ctasks.ratings[&id1], 0.5, 1e-3);
+        assert_almost_eq!(ctasks.ratings[&id3], 0.75, 1e-3);
 
         ctasks.task_usages.insert(id1, vec![50.0]);
         ctasks.task_usages.insert(id2, vec![2020.0]);
@@ -170,9 +170,9 @@ mod tests {
 
         ctasks.complete_task();
 
-        assert_almost_eq!(*ctasks.ratings.get(&id1).unwrap(), 0.2065, 1e-3);
-        assert_almost_eq!(*ctasks.ratings.get(&id2).unwrap(), 0.5869, 1e-3);
-        assert_almost_eq!(*ctasks.ratings.get(&id3).unwrap(), 0.3097, 1e-3);
+        assert_almost_eq!(ctasks.ratings[&id1], 0.2065, 1e-3);
+        assert_almost_eq!(ctasks.ratings[&id2], 0.5869, 1e-3);
+        assert_almost_eq!(ctasks.ratings[&id3], 0.3097, 1e-3);
     }
 
 }

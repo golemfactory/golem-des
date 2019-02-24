@@ -18,8 +18,8 @@ pub struct LGRola {
 }
 
 impl LGRola {
-    pub fn new(id: Id) -> LGRola {
-        LGRola {
+    pub fn new(id: Id) -> Self {
+        Self {
             common: DefenceMechanismCommon::new(id),
             task_usages: HashMap::new(),
             collisions: HashMap::new(),
@@ -58,13 +58,13 @@ impl DefenceMechanism for LGRola {
     fn verify_subtask(
         &mut self,
         _subtask: &SubTask,
-        provider_id: &Id,
+        provider_id: Id,
         reported_usage: Option<f64>,
     ) -> subtask::Status {
         reported_usage.map_or(subtask::Status::Cancelled, |usage| {
             self.task_usages
-                .entry(*provider_id)
-                .or_insert(Vec::new())
+                .entry(provider_id)
+                .or_insert_with(Vec::new)
                 .push(usage);
 
             subtask::Status::Done
@@ -82,7 +82,7 @@ impl DefenceMechanism for LGRola {
             self.blacklisted_set.remove(&id);
         }
 
-        for (_, until) in &mut self.blacklisted_set {
+        for until in self.blacklisted_set.values_mut() {
             until.decrement();
         }
 
@@ -106,7 +106,7 @@ impl DefenceMechanism for LGRola {
                     .and_modify(|collisions| *collisions += 1)
                     .or_insert(1);
 
-                let until = BanDuration::Until((*collisions as f64).exp().ceil() as i64);
+                let until = BanDuration::Until((f64::from(*collisions)).exp().ceil() as i64);
 
                 debug!(
                     "R{}:P{} blacklisted for {:?} requests, usage = {}, collisions = {}",
@@ -189,7 +189,7 @@ mod tests {
             lgrola
                 .task_usages
                 .entry(id)
-                .or_insert(Vec::new())
+                .or_insert_with(Vec::new)
                 .push(50.0);
         }
 

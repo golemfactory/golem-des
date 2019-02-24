@@ -25,8 +25,8 @@ impl RequestorSource {
         RequestorSourceIter {
             count: 0,
             source: self,
-            rng: rng,
-            defence_mechanism_type: defence_mechanism_type,
+            rng,
+            defence_mechanism_type,
         }
     }
 }
@@ -94,7 +94,7 @@ impl ProviderSource {
         ProviderSourceIter {
             count: 0,
             source: self,
-            rng: rng,
+            rng,
         }
     }
 }
