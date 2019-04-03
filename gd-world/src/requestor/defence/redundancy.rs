@@ -68,16 +68,19 @@ impl Redundancy {
     fn update_rating(&mut self, p1: (Id, f64), p2: (Id, f64)) {
         let requestor_id = self.requestor_id;
         let (id1, d1) = p1;
-        let (_, d2) = p2;
-        let old_rating = self.get_provider_rating(id1);
-        let new_rating = old_rating * d1 / d2;
+        let (id2, d2) = p2;
+        let old1 = self.get_provider_rating(id1);
+        let new1 = old1 * (d1 / d2).sqrt();
+        let old2 = self.get_provider_rating(id2);
+        let new2 = old2 / (d1 / d2).sqrt();
 
         debug!(
-            "R{}:P{} failed verification, rating {} => {}",
-            requestor_id, id1, old_rating, new_rating
+            "R{}:failed verification, P{}: {} => {}, P{}: {} => {}",
+            requestor_id, id1, old1, new1, id2, old2, new2
         );
 
-        self.update_provider_rating(id1, new_rating);
+        self.update_provider_rating(id1, new1);
+        self.update_provider_rating(id2, new2);
     }
 }
 
@@ -215,14 +218,14 @@ mod tests {
 
         redundancy.update_rating((p1.0, 200.0), (p2.0, p2.2 / p2.1));
 
-        assert_almost_eq!(redundancy.ratings[&p1.0], 0.5, 1e-5);
-        assert_almost_eq!(redundancy.ratings[&p2.0], 0.75, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p1.0], 0.35355, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p2.0], 0.53033, 1e-5);
         assert!(redundancy.blacklisted_set.is_empty());
 
-        redundancy.update_rating((p1.0, 400.0), (p2.0, p2.2 / p2.1));
+        redundancy.update_rating((p1.0, 4000.0), (p2.0, p2.2 / p2.1));
 
-        assert_almost_eq!(redundancy.ratings[&p1.0], 2.0, 1e-5);
-        assert_almost_eq!(redundancy.ratings[&p2.0], 0.75, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p1.0], 2.23607, 1e-5);
+        assert_almost_eq!(redundancy.ratings[&p2.0], 0.08385, 1e-5);
         assert!(redundancy.blacklisted_set.contains_key(&p1.0));
     }
 
