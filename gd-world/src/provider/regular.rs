@@ -97,48 +97,26 @@ where
 mod tests {
     use super::*;
 
-    use statrs::assert_almost_eq;
-
     use crate::task::SubTask;
-
     #[test]
     fn report_usage() {
         let mut rng = rand::thread_rng();
         let mut provider = RegularProvider::new(0.1, 0.25);
         let subtask = SubTask::new(100.0, 100.0);
 
-        assert_almost_eq!(
-            provider.report_usage(&mut rng, &subtask, 0.1).round(),
-            25.0,
-            1e-6
-        );
-        assert_almost_eq!(
-            provider.report_usage(&mut rng, &subtask, 0.5).round(),
-            25.0,
-            1e-6
-        );
-        assert_almost_eq!(
-            provider.report_usage(&mut rng, &subtask, 1.0).round(),
-            25.0,
-            1e-6
-        );
+        let check = |orig: f64, perturbed: f64| {
+            let diff = (perturbed - orig).abs();
+            diff / orig <= 0.15
+        };
+
+        assert!(check(25.0, provider.report_usage(&mut rng, &subtask, 0.1)));
+        assert!(check(25.0, provider.report_usage(&mut rng, &subtask, 0.5)));
+        assert!(check(25.0, provider.report_usage(&mut rng, &subtask, 1.0)));
 
         provider.usage_factor = 0.75;
 
-        assert_almost_eq!(
-            provider.report_usage(&mut rng, &subtask, 0.1).round(),
-            75.0,
-            1e-6
-        );
-        assert_almost_eq!(
-            provider.report_usage(&mut rng, &subtask, 0.5).round(),
-            75.0,
-            1e-6
-        );
-        assert_almost_eq!(
-            provider.report_usage(&mut rng, &subtask, 1.0).round(),
-            75.0,
-            1e-6
-        );
+        assert!(check(75.0, provider.report_usage(&mut rng, &subtask, 0.1)));
+        assert!(check(75.0, provider.report_usage(&mut rng, &subtask, 0.5)));
+        assert!(check(75.0, provider.report_usage(&mut rng, &subtask, 1.0)));
     }
 }
