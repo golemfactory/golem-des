@@ -1,4 +1,5 @@
 use std::fmt;
+use std::marker::PhantomData;
 
 use gd_world_derive::DerefProviderCommon;
 
@@ -6,12 +7,19 @@ use super::*;
 use crate::task::SubTask;
 
 #[derive(Debug, DerefProviderCommon)]
-pub struct UndercutBudgetProvider {
+pub struct UndercutBudgetProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     epsilon: f64,
     common: ProviderCommon,
+    phantom: PhantomData<Rng>,
 }
 
-impl UndercutBudgetProvider {
+impl<Rng> UndercutBudgetProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     pub fn new(min_price: f64, usage_factor: f64, epsilon: f64) -> Self {
         Self::with_id(Id::new(), min_price, usage_factor, epsilon)
     }
@@ -20,11 +28,15 @@ impl UndercutBudgetProvider {
         Self {
             epsilon,
             common: ProviderCommon::new(id, min_price, usage_factor),
+            phantom: PhantomData,
         }
     }
 }
 
-impl fmt::Display for UndercutBudgetProvider {
+impl<Rng> fmt::Display for UndercutBudgetProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -37,8 +49,13 @@ impl fmt::Display for UndercutBudgetProvider {
     }
 }
 
-impl Provider for UndercutBudgetProvider {
-    fn report_usage(&self, subtask: &SubTask, bid: f64) -> f64 {
+impl<Rng> Provider for UndercutBudgetProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
+    type Rng = Rng;
+
+    fn report_usage(&self, _rng: &mut Self::Rng, subtask: &SubTask, bid: f64) -> f64 {
         subtask.budget / bid * (1.0 - self.epsilon)
     }
 
@@ -68,6 +85,10 @@ impl Provider for UndercutBudgetProvider {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
 }
 
 #[cfg(test)]
@@ -80,15 +101,24 @@ mod tests {
 
     #[test]
     fn report_usage() {
+        let mut rng = rand::thread_rng();
         let mut provider = UndercutBudgetProvider::new(0.1, 0.1, 0.0);
         let subtask = SubTask::new(100.0, 100.0);
 
-        assert_almost_eq!(provider.report_usage(&subtask, 1.0), 100.0, 1e-6);
-        assert_almost_eq!(provider.report_usage(&subtask, 0.1) * 0.1, 100.0, 1e-6);
+        assert_almost_eq!(provider.report_usage(&mut rng, &subtask, 1.0), 100.0, 1e-6);
+        assert_almost_eq!(
+            provider.report_usage(&mut rng, &subtask, 0.1) * 0.1,
+            100.0,
+            1e-6
+        );
 
         provider.epsilon = 0.5;
 
-        assert_almost_eq!(provider.report_usage(&subtask, 1.0), 50.0, 1e-6);
-        assert_almost_eq!(provider.report_usage(&subtask, 0.1) * 0.1, 50.0, 1e-6);
+        assert_almost_eq!(provider.report_usage(&mut rng, &subtask, 1.0), 50.0, 1e-6);
+        assert_almost_eq!(
+            provider.report_usage(&mut rng, &subtask, 0.1) * 0.1,
+            50.0,
+            1e-6
+        );
     }
 }

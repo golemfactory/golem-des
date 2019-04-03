@@ -76,7 +76,10 @@ pub struct ProviderSpec {
 }
 
 impl ProviderSpec {
-    pub fn as_provider(&self) -> Box<dyn Provider> {
+    pub fn as_provider<Rng>(&self) -> Box<dyn Provider<Rng = Rng>>
+    where
+        Rng: rand::Rng + 'static,
+    {
         match self.behaviour {
             ProviderBehaviour::UndercutBudget(epsilon) => {
                 Box::new(UndercutBudgetProvider::with_id(

@@ -21,17 +21,17 @@ pub enum Event {
 #[derive(Debug)]
 pub struct World<Rng>
 where
-    Rng: rand::Rng,
+    Rng: rand::Rng + 'static,
 {
     rng: Rng,
     engine: Engine<Event>,
     requestors: HashMap<Id, Requestor>,
-    providers: HashMap<Id, Box<dyn Provider>>,
+    providers: HashMap<Id, Box<dyn Provider<Rng = Rng>>>,
 }
 
 impl<Rng> World<Rng>
 where
-    Rng: rand::Rng,
+    Rng: rand::Rng + 'static,
 {
     pub fn new(rng: Rng) -> Self {
         Self {
@@ -57,7 +57,7 @@ where
         }
     }
 
-    pub fn push_provider(&mut self, provider: Box<dyn Provider>) {
+    pub fn push_provider(&mut self, provider: Box<dyn Provider<Rng = Rng>>) {
         debug!("W:adding {}", provider);
 
         self.providers.insert(*provider.id(), provider);
@@ -65,7 +65,7 @@ where
 
     pub fn append_providers<It>(&mut self, providers: It)
     where
-        It: IntoIterator<Item = Box<dyn Provider>>,
+        It: IntoIterator<Item = Box<dyn Provider<Rng = Rng>>>,
     {
         for provider in providers {
             self.push_provider(provider);
@@ -139,7 +139,7 @@ where
             .expect("provider not found");
 
         provider.finish_computing(self.engine.now(), &subtask, requestor_id);
-        let reported_usage = provider.report_usage(&subtask, bid);
+        let reported_usage = provider.report_usage(&mut self.rng, &subtask, bid);
         requestor.verify_subtask(&subtask, provider_id, Some(reported_usage));
         let payment = requestor.send_payment(&subtask, provider_id, bid, reported_usage);
         provider.receive_payment(&subtask, requestor_id, payment);

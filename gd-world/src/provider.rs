@@ -8,7 +8,7 @@ pub use self::undercut_budget::UndercutBudgetProvider;
 
 use std::any::Any;
 use std::fmt;
-use std::ops::{Deref, DerefMut};
+use std::ops;
 
 use gd_engine::Engine;
 use log::debug;
@@ -54,17 +54,42 @@ pub struct Stats {
     pub num_subtasks_cancelled: usize,
 }
 
-pub trait Provider: fmt::Debug + fmt::Display {
-    fn report_usage(&self, subtask: &SubTask, bid: f64) -> f64;
+pub trait Provider {
+    type Rng: rand::Rng + 'static;
+
+    fn report_usage(&self, rng: &mut Self::Rng, subtask: &SubTask, bid: f64) -> f64;
     fn into_stats(self: Box<Self>, run_id: u64) -> Stats;
 
     fn as_provider_common(&self) -> &ProviderCommon;
     fn as_provider_common_mut(&mut self) -> &mut ProviderCommon;
 
     fn as_any(&self) -> &dyn Any;
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result;
 }
 
-impl Deref for Provider {
+impl<Rng> fmt::Debug for Provider<Rng = Rng>
+where
+    Rng: rand::Rng + 'static,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt(f)
+    }
+}
+
+impl<Rng> fmt::Display for Provider<Rng = Rng>
+where
+    Rng: rand::Rng + 'static,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt(f)
+    }
+}
+
+impl<Rng> ops::Deref for Provider<Rng = Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     type Target = ProviderCommon;
 
     fn deref(&self) -> &Self::Target {
@@ -72,7 +97,10 @@ impl Deref for Provider {
     }
 }
 
-impl DerefMut for Provider {
+impl<Rng> ops::DerefMut for Provider<Rng = Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_provider_common_mut()
     }

@@ -1,16 +1,28 @@
 use std::fmt;
+use std::marker::PhantomData;
 
 use gd_world_derive::DerefProviderCommon;
+use rand::distributions::Normal;
+use rand::prelude::*;
 
 use super::*;
 use crate::task::SubTask;
 
 #[derive(Debug, DerefProviderCommon)]
-pub struct RegularProvider {
+pub struct RegularProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     common: ProviderCommon,
+    phantom: PhantomData<Rng>,
 }
 
-impl RegularProvider {
+impl<Rng> RegularProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
+    const USAGE_JITTER: f64 = 0.05;
+
     pub fn new(min_price: f64, usage_factor: f64) -> Self {
         Self::with_id(Id::new(), min_price, usage_factor)
     }
@@ -18,11 +30,15 @@ impl RegularProvider {
     pub fn with_id(id: Id, min_price: f64, usage_factor: f64) -> Self {
         Self {
             common: ProviderCommon::new(id, min_price, usage_factor),
+            phantom: PhantomData,
         }
     }
 }
 
-impl fmt::Display for RegularProvider {
+impl<Rng> fmt::Display for RegularProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -34,9 +50,15 @@ impl fmt::Display for RegularProvider {
     }
 }
 
-impl Provider for RegularProvider {
-    fn report_usage(&self, subtask: &SubTask, _bid: f64) -> f64 {
-        subtask.nominal_usage * self.usage_factor()
+impl<Rng> Provider for RegularProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
+    type Rng = Rng;
+
+    fn report_usage(&self, rng: &mut Self::Rng, subtask: &SubTask, _bid: f64) -> f64 {
+        let usage = subtask.nominal_usage * self.usage_factor();
+        usage * (1.0 + Normal::new(0.0, Self::USAGE_JITTER).sample(rng))
     }
 
     fn into_stats(self: Box<Self>, run_id: u64) -> Stats {
@@ -65,6 +87,10 @@ impl Provider for RegularProvider {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
 }
 
 #[cfg(test)]
@@ -77,17 +103,42 @@ mod tests {
 
     #[test]
     fn report_usage() {
+        let mut rng = rand::thread_rng();
         let mut provider = RegularProvider::new(0.1, 0.25);
         let subtask = SubTask::new(100.0, 100.0);
 
-        assert_almost_eq!(provider.report_usage(&subtask, 0.1), 25.0, 1e-6);
-        assert_almost_eq!(provider.report_usage(&subtask, 0.5), 25.0, 1e-6);
-        assert_almost_eq!(provider.report_usage(&subtask, 1.0), 25.0, 1e-6);
+        assert_almost_eq!(
+            provider.report_usage(&mut rng, &subtask, 0.1).round(),
+            25.0,
+            1e-6
+        );
+        assert_almost_eq!(
+            provider.report_usage(&mut rng, &subtask, 0.5).round(),
+            25.0,
+            1e-6
+        );
+        assert_almost_eq!(
+            provider.report_usage(&mut rng, &subtask, 1.0).round(),
+            25.0,
+            1e-6
+        );
 
         provider.usage_factor = 0.75;
 
-        assert_almost_eq!(provider.report_usage(&subtask, 0.1), 75.0, 1e-6);
-        assert_almost_eq!(provider.report_usage(&subtask, 0.5), 75.0, 1e-6);
-        assert_almost_eq!(provider.report_usage(&subtask, 1.0), 75.0, 1e-6);
+        assert_almost_eq!(
+            provider.report_usage(&mut rng, &subtask, 0.1).round(),
+            75.0,
+            1e-6
+        );
+        assert_almost_eq!(
+            provider.report_usage(&mut rng, &subtask, 0.5).round(),
+            75.0,
+            1e-6
+        );
+        assert_almost_eq!(
+            provider.report_usage(&mut rng, &subtask, 1.0).round(),
+            75.0,
+            1e-6
+        );
     }
 }

@@ -14,8 +14,11 @@ pub fn deref_defence_mechanism_common_derive(input: TokenStream) -> TokenStream 
 
 fn impl_deref_defence_mechanism_common(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
+    let generics = &ast.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     let gen = quote! {
-        impl std::ops::Deref for #name {
+        impl #impl_generics std::ops::Deref for #name #ty_generics #where_clause {
             type Target = DefenceMechanismCommon;
 
             fn deref(&self) -> &Self::Target {
@@ -23,7 +26,7 @@ fn impl_deref_defence_mechanism_common(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        impl std::ops::DerefMut for #name {
+        impl #impl_generics std::ops::DerefMut for #name #ty_generics #where_clause {
             fn deref_mut(&mut self) -> &mut Self::Target {
                 self.as_dm_common_mut()
             }
@@ -42,8 +45,11 @@ pub fn deref_provider_common_derive(input: TokenStream) -> TokenStream {
 
 fn impl_deref_provider_common(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
+    let generics = &ast.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     let gen = quote! {
-        impl std::ops::Deref for #name {
+        impl #impl_generics std::ops::Deref for #name #ty_generics #where_clause {
             type Target = ProviderCommon;
 
             fn deref(&self) -> &Self::Target {
@@ -51,7 +57,7 @@ fn impl_deref_provider_common(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        impl DerefMut for #name {
+        impl #impl_generics std::ops::DerefMut for #name #ty_generics #where_clause {
             fn deref_mut(&mut self) -> &mut Self::Target {
                 self.as_provider_common_mut()
             }
