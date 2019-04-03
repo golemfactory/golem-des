@@ -67,16 +67,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                 None => ChaChaRng::from_entropy(),
             };
 
-            let mut requestors: Vec<Requestor> = Vec::new();
-            let mut providers: Vec<Box<dyn Provider>> = Vec::new();
-
             // create pre-specified actors
+            let mut requestors = Vec::new();
             if let Some(rs) = &params.requestors {
                 for spec in rs {
                     requestors.push(spec.as_requestor(&mut rng, args.flag_defence));
                 }
             }
 
+            let mut providers = Vec::new();
             if let Some(ps) = &params.providers {
                 for spec in ps {
                     providers.push(spec.as_provider());

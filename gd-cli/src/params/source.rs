@@ -20,7 +20,7 @@ impl RequestorSource {
         defence_mechanism_type: DefenceMechanismType,
     ) -> RequestorSourceIter<Rng>
     where
-        Rng: rand::Rng,
+        Rng: rand::Rng + 'static,
     {
         RequestorSourceIter {
             count: 0,
@@ -34,7 +34,7 @@ impl RequestorSource {
 #[derive(Debug)]
 pub struct RequestorSourceIter<'a, Rng>
 where
-    Rng: rand::Rng,
+    Rng: rand::Rng + 'static,
 {
     count: usize,
     source: &'a RequestorSource,
@@ -44,7 +44,7 @@ where
 
 impl<'a, Rng> Iterator for RequestorSourceIter<'a, Rng>
 where
-    Rng: rand::Rng,
+    Rng: rand::Rng + 'static,
 {
     type Item = Requestor;
 
@@ -89,7 +89,7 @@ pub struct ProviderSource {
 impl ProviderSource {
     pub fn iter<'a, Rng>(&'a self, rng: &'a mut Rng) -> ProviderSourceIter<Rng>
     where
-        Rng: rand::Rng,
+        Rng: rand::Rng + 'static,
     {
         ProviderSourceIter {
             count: 0,
@@ -102,7 +102,7 @@ impl ProviderSource {
 #[derive(Debug)]
 pub struct ProviderSourceIter<'a, Rng>
 where
-    Rng: rand::Rng,
+    Rng: rand::Rng + 'static,
 {
     count: usize,
     source: &'a ProviderSource,
@@ -111,11 +111,11 @@ where
 
 impl<'a, Rng> Iterator for ProviderSourceIter<'a, Rng>
 where
-    Rng: rand::Rng,
+    Rng: rand::Rng + 'static,
 {
-    type Item = Box<dyn Provider>;
+    type Item = Box<dyn Provider<Rng = Rng>>;
 
-    fn next(&mut self) -> Option<Box<dyn Provider>> {
+    fn next(&mut self) -> Option<Box<dyn Provider<Rng = Rng>>> {
         if self.count >= self.source.provider_count {
             return None;
         }

@@ -1,4 +1,5 @@
 use std::fmt;
+use std::marker::PhantomData;
 
 use gd_world_derive::DerefProviderCommon;
 
@@ -7,12 +8,19 @@ use crate::id::Id;
 use crate::task::SubTask;
 
 #[derive(Debug, DerefProviderCommon)]
-pub struct LinearUsageInflationProvider {
+pub struct LinearUsageInflationProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     inflation_factor: f64,
     common: ProviderCommon,
+    phantom: PhantomData<Rng>,
 }
 
-impl LinearUsageInflationProvider {
+impl<Rng> LinearUsageInflationProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     pub fn new(min_price: f64, usage_factor: f64, inflation_factor: f64) -> Self {
         Self::with_id(Id::new(), min_price, usage_factor, inflation_factor)
     }
@@ -21,11 +29,15 @@ impl LinearUsageInflationProvider {
         Self {
             inflation_factor,
             common: ProviderCommon::new(id, min_price, usage_factor),
+            phantom: PhantomData,
         }
     }
 }
 
-impl fmt::Display for LinearUsageInflationProvider {
+impl<Rng> fmt::Display for LinearUsageInflationProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -38,8 +50,13 @@ impl fmt::Display for LinearUsageInflationProvider {
     }
 }
 
-impl Provider for LinearUsageInflationProvider {
-    fn report_usage(&self, subtask: &SubTask, bid: f64) -> f64 {
+impl<Rng> Provider for LinearUsageInflationProvider<Rng>
+where
+    Rng: rand::Rng + 'static,
+{
+    type Rng = Rng;
+
+    fn report_usage(&self, _rng: &mut Self::Rng, subtask: &SubTask, bid: f64) -> f64 {
         let intercept = self.usage_factor() * subtask.nominal_usage;
         let usage = self.num_subtasks_computed as f64 * self.inflation_factor + intercept;
 
@@ -72,6 +89,10 @@ impl Provider for LinearUsageInflationProvider {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
 }
 
 #[cfg(test)]
@@ -84,20 +105,21 @@ mod tests {
 
     #[test]
     fn report_usage() {
+        let mut rng = rand::thread_rng();
         let mut provider = LinearUsageInflationProvider::new(0.1, 0.5, 1.0);
         let subtask = SubTask::new(100.0, 100.0);
-        assert_almost_eq!(50.0, provider.report_usage(&subtask, 1.0), 1e-3);
+        assert_almost_eq!(50.0, provider.report_usage(&mut rng, &subtask, 1.0), 1e-3);
 
         provider.num_subtasks_computed = 1;
-        assert_almost_eq!(51.0, provider.report_usage(&subtask, 1.0), 1e-3);
+        assert_almost_eq!(51.0, provider.report_usage(&mut rng, &subtask, 1.0), 1e-3);
 
         provider.num_subtasks_computed = 50;
-        assert_almost_eq!(100.0, provider.report_usage(&subtask, 1.0), 1e-3);
+        assert_almost_eq!(100.0, provider.report_usage(&mut rng, &subtask, 1.0), 1e-3);
 
         provider.num_subtasks_computed = 51;
-        assert_almost_eq!(100.0, provider.report_usage(&subtask, 1.0), 1e-3);
+        assert_almost_eq!(100.0, provider.report_usage(&mut rng, &subtask, 1.0), 1e-3);
 
         provider.num_subtasks_computed = 100;
-        assert_almost_eq!(100.0, provider.report_usage(&subtask, 1.0), 1e-3);
+        assert_almost_eq!(100.0, provider.report_usage(&mut rng, &subtask, 1.0), 1e-3);
     }
 }
